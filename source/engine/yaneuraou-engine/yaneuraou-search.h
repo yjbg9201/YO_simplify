@@ -344,10 +344,6 @@ class YaneuraOuWorker: public Worker {
     // 評価関数のパラメーターが各NUMAにコピーされているようにする。
     virtual void ensure_network_replicated() override;
 
-    // qsearch<PV>()をTT hitなし扱いで行い、この呼び出し中に得られたPVを返す。
-    // 返されたPVを進めた局面が、qsearchで到達したleaf nodeになる。
-    Value qsearch_pv(Position& pos, PVMoves& pv);
-
     // 📌 Stockfishのsearch.hで定義されているWorkerが持っているメンバ変数 📌
 
 	// Public because they need to be updatable by the stats

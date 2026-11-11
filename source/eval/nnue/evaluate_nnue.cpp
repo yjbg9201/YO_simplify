@@ -116,14 +116,6 @@ namespace {
 			return obj.ReadParameters(stream);
 		}
 
-		// 評価関数パラメータを書き込む（参照版）
-		template <typename T>
-		bool WriteParameters(std::ostream& stream, const T& obj) {
-			constexpr std::uint32_t header = T::GetHashValue();
-			stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
-			return obj.WriteParameters(stream);
-		}
-
 	}  // namespace Detail
 
 	// テンポラリにパラメータを読み込み、共有メモリに配置する。
@@ -187,29 +179,9 @@ namespace {
 		return !stream.fail() ? Tools::ResultCode::Ok : Tools::ResultCode::FileReadError;
     }
 
-    // ヘッダを書き込む
-    bool WriteHeader(std::ostream& stream,
-        std::uint32_t hash_value, const std::string& architecture) {
-        stream.write(reinterpret_cast<const char*>(&kVersion), sizeof(kVersion));
-        stream.write(reinterpret_cast<const char*>(&hash_value), sizeof(hash_value));
-        const std::uint32_t size = static_cast<std::uint32_t>(architecture.size());
-        stream.write(reinterpret_cast<const char*>(&size), sizeof(size));
-        stream.write(architecture.data(), size);
-        return !stream.fail();
-    }
-
     	// 評価関数パラメータを読み込む
     Tools::Result ReadParameters(std::istream& stream, std::string* failed_file) {
         return LoadAndShare(stream, failed_file);
-    }
-    // 評価関数パラメータを書き込む
-    bool WriteParameters(std::ostream& stream) {
-        if (!WriteHeader(stream, kHashValue, GetArchitectureString())) return false;
-        if (!Detail::WriteParameters<FeatureTransformer>(stream, networks().feature_transformer)) return false;
-        for (int i = 0; i < kLayerStacks; ++i) {
-            if (!Detail::WriteParameters<Network>(stream, networks().network[i])) return false;
-        }
-        return !stream.fail();
     }
 
     // 差分計算ができるなら進める
@@ -316,16 +288,6 @@ Value evaluate(const Position& pos) {
     Value score = NNUE::ComputeScore(pos);
 
     return score;
-}
-
-// 差分計算ができるなら進める
-void evaluate_with_no_return(const Position& pos) {
-    NNUE::UpdateAccumulatorIfPossible(pos);
-}
-
-// 現在の局面の評価値の内訳を表示する
-void print_eval_stat(Position& /*pos*/) {
-    std::cout << "--- EVAL STAT: not implemented" << std::endl;
 }
 
 } // namespace Eval

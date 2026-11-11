@@ -117,9 +117,6 @@ struct BookMoves
 	// こちらのほうが、同一の指し手が含まれるかのチェックをしない分だけ高速。
 	void push_back(const BookMove& book_move);
 
-	// [ASYNC] ある指し手と同じBookMoveのエントリーを探して、あればそのポインターを返す。
-	std::shared_ptr<BookMove> find_move(const Move16 move) const;
-
 	// [ASYNC] この局面に登録されている指し手の数を返す。
 	// 指し手の数は、MAX_MOVESであるので、intの範囲で十分であるのだが、
 	// std::vector.size()とコンパチでないと色んなところで警告が出てうざいのでsize_tにしておく。
@@ -188,13 +185,6 @@ struct MemoryBook
 	// ・filenameはpathとして"book/"を補完しないので生のpathを指定する。
 	Tools::Result read_book(const std::string& filename, bool on_the_fly = false);
 
-	// [ASYNC] 定跡ファイルの書き出し
-	// ・sort = 書き出すときにsfen文字列で並び替えるのか。(書き出しにかかる時間増)
-	// →　必ずソートするように変更した。
-	// ・ファイルへの書き出しは、*thisを書き換えないという意味においてconst性があるので関数にconstを付与しておく。
-	// また、事前にis_ready()は呼び出されているものとする。
-	Tools::Result write_book(const std::string& filename /*, bool sort = false*/) const;
-
 	// --------------------------------------------------------------------------
 	//   以下のメンバは、普段は外部から普段は直接アクセスすべきではない。
 	//
@@ -204,22 +194,11 @@ struct MemoryBook
 	// [ASYNC] book_body.find()のwrapper。book_body.find()ではなく、こちらのfindを呼び出して用いること。
 	BookMovesPtr find(const std::string& sfen) const;
 
-	// [ASYNC] メモリに保持している定跡に局面を一つ追加する。
-	//   book_body[sfen] = ptr;
-	// と等価。すでに登録されているとしたら、それは置き換わる。
-	void append(const std::string& sfen, const Book::BookMovesPtr ptr);
-
 	// [ASYNC] book_bodyの局面sfenに対してBookMoveを一つ追加するヘルパー関数。
 	// 同じ局面に対して繰り返し、この関数を呼ぶぐらいなら、BookMovesに直接push_back()してから、このクラスのappend()を呼ぶべき。
 	// overwrite : このフラグがtrueならば、その局面ですでに同じmoveの指し手が登録されている場合は上書き動作。(このとき採択回数num,win,loseは合算する)
 	//             このフラグがfalseならば、その局面ですでに同じmoveの指し手が登録されている場合は何もしない。
 	void insert(const std::string& sfen, const BookMove& bp , bool overwrite = true);
-
-	// [ASYNC] 他のbookをmergeする。
-	void merge(MemoryBook& book2);
-
-	// [ASYNC] このクラスの持つ定跡DBに対して、それぞれの局面を列挙する時に用いる
-	void foreach(std::function<void(const std::string& /*sfen*/, const Book::BookMovesPtr)> f);
 
 	// 保持している局面数を返す。これは、on the flyではない状態でread_book()した時にのみ有効。
 	size_t size() const { return ybb_memory_book ? static_cast<size_t>(ybb_record_count) : book_body.size(); }
@@ -387,34 +366,6 @@ protected:
 
 }
 
-// 定跡関係の処理のための補助ツール群
-namespace BookTools
-{
-// USIの"position"コマンドに設定できる文字列で、局面を初期化する。
-// 例)
-// "startpos"
-// "startpos moves xxx ..."
-// "sfen xxx"
-// "sfen xxx moves yyy ..."
-// また、局面を1つ進めるごとにposition_callback関数が呼び出される。
-// 辿った局面すべてに対して何かを行いたい場合は、これを利用すると良い。
-// 
-// position_callbackは、その局面と、その局面での指し手が引数にセットされて呼び出される。
-// 与えたsfenの最後の局面では、MoveはMove::none()が入って呼び出される。
-void feed_position_string(Position& pos, const std::string& root_sfen, std::deque<StateInfo>& si,
-	const std::function<void(Position&, Move)>& position_callback = [](Position&, Move) {});
-
-// 平手、駒落ちの開始局面集
-// ここで返ってきた配列の、[0]は平手のsfenであることは保証されている。
-// 先頭に"sfen "とついているのでこれはPosition::set()では設定できないから注意。
-// Position::set()を用いるなら先頭の"sfen"の文字列を削るか、さもなくばfeed_position_string()を用いること。
-std::vector<std::string> get_start_sfens();
-
-// "position"コマンドに設定できるsfen文字列を渡して、そこから全合法手で１手進めたsfen文字列を取得する。
-// 先頭に"sfen "とついているので注意。
-std::vector<std::string> get_next_sfens(std::string root_sfen);
-
-} // namespace Book
 } // namespace YaneuraOu
 
 #endif // #ifndef INCLUDED_

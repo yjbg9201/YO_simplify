@@ -35,16 +35,6 @@ namespace Book
 		sorted = false; // sort関係が崩れたのでフラグをfalseに戻しておく。
 	}
 
-	// ある指し手と同じBookMoveのエントリーを探して、あればそのiteratorを返す。
-	// thread safeにするためにコピーして返す。
-	std::shared_ptr<BookMove> BookMoves::find_move(const Move16 m16) const
-	{
-		std::lock_guard<std::recursive_mutex> lock(const_cast<BookMoves*>(this)->mutex_);
-
-		auto it = std::find_if(moves.begin(), moves.end(), [m16](const BookMove& book_move) { return book_move.move == m16; });
-		return std::shared_ptr<BookMove>(it == moves.end() ? nullptr : new BookMove(*it));
-	}
-
 	// 指し手を出現回数、評価値順に並び替える。
 	// ※　より正確に言うなら、BookMoveのoperator <()で定義されている順。
 	// すでに並び替わっているなら、何もしない。
@@ -124,16 +114,6 @@ namespace Book
 		sorted = false; // sort関係が崩れたのでフラグをfalseに戻しておく。
 	}
 
-	// [ASYNC] 他のbookをmergeする。
-	void MemoryBook::merge(MemoryBook& book2)
-	{
-		std::lock_guard<std::recursive_mutex> lock(mutex_);
-		book2.foreach([&](const std::string& sfen, const Book::BookMovesPtr book_moves)
-		{
-			this->append(sfen, book_moves);
-		});
-	}
-
 	// [ASYNC] このクラスの持つ指し手集合に対して、それぞれの局面を列挙する時に用いる
 	void BookMoves::foreach(std::function<void(BookMove&)> f)
 	{
@@ -160,15 +140,6 @@ namespace Book
 			auto& book_moves = *it->second;
 			book_moves.insert(bp, overwrite);
 		}
-	}
-
-	// [ASYNC] このクラスの持つ定跡DBに対して、それぞれの局面を列挙する時に用いる
-	void MemoryBook::foreach(std::function<void(const std::string& /*sfen*/, const BookMovesPtr)> f)
-	{
-		std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-		for(auto& it : book_body)
-			f(it.first,it.second);
 	}
 
 	// ----------------------------------
@@ -719,123 +690,6 @@ namespace Book
 		return Tools::Result::Ok();
 	}
 
-	// 定跡ファイルの書き出し
-	Tools::Result MemoryBook::write_book(const std::string& filename /*, bool sort*/) const
-	{
-		std::lock_guard<std::recursive_mutex> lock(const_cast<MemoryBook*>(this)->mutex_);
-
-		if (ybb_memory_book)
-		{
-			sync_cout << "info string Error! : ybb memory book cannot be written by MemoryBook::write_book(). use convert_ybb_to_db.py." << sync_endl;
-			return Tools::Result(Tools::ResultCode::FileWriteError);
-		}
-
-		// Position::set()で評価関数の読み込みが必要。
-		//is_ready();
-
-		// →　この関数はbookコマンドからしか呼び出さず、bookコマンドの処理の先頭付近でis_ready()を
-		// 呼び出しているため、この関数のなかでのis_ready()は呼び出さないことにする。
-
-		SystemIO::TextWriter writer;
-		if (writer.Open(filename).is_not_ok())
-			return Tools::Result(Tools::ResultCode::FileOpenError);
-
-		std::cout << "write " + filename << std::endl;
-
-		// バージョン識別用文字列
-		writer.WriteLine(BookDBHeader2016_100);
-
-		std::vector<std::pair<std::string, BookMovesPtr> > vectored_book;
-
-		// 重複局面の手数違いを除去するのに用いる。
-		// 手数違いの重複局面はoptions["IgnoreBookPly"]==trueのときに有害であるため、plyが最小のもの以外を削除する必要がある。
-		// (options["BookOnTheFly"]==true かつ options["IgnoreBookPly"] == true のときに、手数違いのものがヒットするだとか、そういう問題と、
-		// options["IgnoreBookPly"]==trueのときにMemoryBook::read_book()で読み込むときに重複エントリーがあって何か地雷を踏んでしまう的な問題を回避。
-
-		// sfenの手数の手前までの文字列とそのときの手数
-		std::unordered_map<std::string, int> book_ply;
-
-		for (auto& it : book_body)
-		{
-			// 指し手のない空っぽのentryは書き出さないように。
-			if (it.second->size() == 0)
-				continue;
-			vectored_book.push_back(it);
-		}
-
-		// sfen文字列は手駒の表記に揺れがある。
-		// (USI原案のほうでは規定されているのだが、将棋所が採用しているUSIプロトコルではこの規定がない。)
-		// sortするタイミングで、一度すべての局面を読み込み、sfen()化しなおすことで
-		// やねうら王が用いているsfenの手駒表記(USI原案)に統一されるようにする。
-
-		// 進捗の出力
-		u64 counter = 0;
-		Tools::ProgressBar progress(vectored_book.size() * 2);
-
-		{
-			Position pos;
-
-			// std::vectorにしてあるのでit.firstを書き換えてもitは無効にならないはず。
-			for (auto& it : vectored_book)
-			{
-				StateInfo si;
-				pos.set(it.first, &si);
-				auto sfen = pos.sfen();
-				it.first = sfen;
-
-				auto sfen_left = StringExtension::trim_number(sfen); // 末尾にplyがあるはずじゃろ
-				int ply = StringExtension::to_int(sfen.substr(sfen_left.length()), 0);
-
-				auto it2 = book_ply.find(sfen_left);
-				if (it2 == book_ply.end())
-					book_ply[sfen_left] = ply; // エントリーが見つからなかったので何も考えずに追加
-				else
-					it2->second = std::min(it2->second, ply); // 手数の短いほうを代入しておく。
-
-				progress.check(++counter);
-			}
-		}
-
-		// ここvectored_bookが、sfen文字列でsortされていて欲しいのでsortする。
-		// アルファベットの範囲ではlocaleの影響は受けない…はず…。
-		std::sort(vectored_book.begin(), vectored_book.end(),
-			[](const std::pair<std::string, BookMovesPtr>&lhs, const std::pair<std::string, BookMovesPtr>&rhs) {
-			return lhs.first < rhs.first;
-		});
-
-		for (auto& it : vectored_book)
-		{
-			// -- 重複局面の手数違いの局面はスキップする(ファイルに書き出さない)
-
-			auto sfen = it.first;
-			auto sfen_left = StringExtension::trim_number(sfen); // 末尾にplyがあるはずじゃろ
-			int ply = StringExtension::to_int(sfen.substr(sfen_left.length()), 0);
-			if (book_ply[sfen_left] != ply)
-				continue;
-
-			// -- このentryを書き出す
-
-			writer.WriteLine("sfen " + it.first /* is sfen string */); // sfen
-
-			auto& move_list = *it.second;
-
-			// 何らかsortしておく。
-			move_list.sort_moves();
-
-			// 指し手、相手の応手、そのときの評価値、探索深さ、採択回数
-			for (auto& bp : move_list)
-				if (writer.WriteLine(to_usi_string(bp.move) + ' ' + to_usi_string(bp.ponder) + ' '
-					+ std::to_string(bp.value) + " " + std::to_string(bp.depth) + " " + std::to_string(bp.move_count)).is_not_ok())
-					return Tools::Result(Tools::ResultCode::FileWriteError);
-
-			progress.check(++counter);
-		}
-
-		writer.Close();
-
-		return Tools::Result::Ok();
-	}
-
 	// book_body.find()のwrapper。book_body.find()ではなく、こちらのfindを呼び出して用いること。
 	// sfen : sfen文字列(末尾にplyまで書かれているものとする)
 	BookMovesPtr MemoryBook::find(const std::string& sfen) const
@@ -844,15 +698,6 @@ namespace Book
 
 		auto it = book_body.find(trim(sfen));
 		return it == book_body.end() ? BookMovesPtr() : it->second;
-	}
-
-	// [ASYNC] メモリに保持している定跡に局面を一つ追加する。
-	//   book_body[sfen] = ptr;
-	// と等価。
-	void MemoryBook::append(const std::string& sfen, const Book::BookMovesPtr ptr)
-	{
-		std::lock_guard<std::recursive_mutex> lock(mutex_);
-		book_body[sfen] = ptr;
 	}
 
 	// 反転された指し手を登録した新規エントリーを作成するヘルパー関数。
@@ -1744,148 +1589,4 @@ namespace Book
 
 }
 
-// ===================================================
-//                  BookTools
-// ===================================================
-
-// 定跡関係の処理のための補助ツール群
-namespace BookTools
-{
-	// USIの"position"コマンドに設定できる文字列で、局面を初期化する。
-	// 例)
-	// "startpos"
-	// "startpos moves xxx ..."
-	// "sfen xxx"
-	// "sfen xxx moves yyy ..."
-	// また、局面を1つ進めるごとにposition_callback関数が呼び出される。
-	// 辿った局面すべてに対して何かを行いたい場合は、これを利用すると良い。
-	void feed_position_string(Position& pos, const std::string& root_sfen, std::deque<StateInfo>& si,
-		const std::function<void(Position&,Move)>& position_callback)
-	{
-		// issから次のtokenを取得する
-		auto feed_next = [](Parser::LineScanner& iss)
-		{
-			return iss.get_text();
-		};
-
-		// "sfen"に後続するsfen文字列をissからfeedする
-		auto feed_sfen = [&feed_next](Parser::LineScanner& iss)
-		{
-			std::stringstream sfen;
-
-			// ループではないが条件外であるときにbreakでreturnのところに行くためのhack
-			while(true)
-			{
-				std::string token;
-
-				// 盤面を表すsfen文字列
-				sfen << feed_next(iss);
-
-				// 手番
-				token = feed_next(iss);
-				if (token != "w" && token != "b")
-					break;
-				sfen << " " << token;
-
-				// 手駒
-				sfen << " " << feed_next(iss);
-
-				// 初期局面からの手数
-				sfen <<  " " << feed_next(iss);
-
-				break;
-			}
-			return sfen.str();
-		};
-
-		si.clear();
-		si.emplace_back(StateInfo()); // このあとPosition::set()かset_hirate()を呼び出すので一つは必要。
-
-		Parser::LineScanner iss(root_sfen);
-		std::string token;
-		do {
-			token = feed_next(iss);
-			if (token == "sfen")
-			{
-				// 駒落ちなどではsfen xxx movesとなるのでこれをfeedしなければならない。
-				auto sfen = feed_sfen(iss);
-				pos.set(sfen, &si.back());
-			}
-			else if (token == "startpos")
-			{
-				// 平手初期化
-				pos.set_hirate(&si.back());
-			}
-		} while (token == "startpos" || token == "sfen" || token == "moves"/* movesは無視してループを回る*/ );
-
-		// moves以降は1手ずつ進める
-		while (token != "")
-		{
-			// 非合法手ならUSI::to_moveはMOVE_NONEを返すはず…。
-			Move move = USIEngine::to_move(pos, token);
-			if (move == Move::none())
-				break;
-
-			// MOVE_NULL,MOVE_WINでは局面を進められないのでここで終了。
-			if (!move.is_ok())
-				break;
-
-			// callbackを呼び出してやる。
-			position_callback(pos, move);
-
-			si.emplace_back(StateInfo());
-			pos.do_move(move, si.back());
-
-			token = feed_next(iss);
-		}
-
-		// 最後の局面でcallbackを呼び出してやる。
-		position_callback(pos, Move::none());
-	}
-
-	// 平手、駒落ちの開始局面集
-	// ここで返ってきた配列の、[0]は平手のsfenであることは保証されている。
-	std::vector<std::string> get_start_sfens()
-	{
-		std::vector<std::string> start_sfens = {
-			/*public static readonly string HIRATE             = */ "sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1" ,
-			/*public static readonly string HANDICAP_KYO       = */ "sfen lnsgkgsn1/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1" ,
-			/*public static readonly string HANDICAP_RIGHT_KYO = */ "sfen 1nsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_KAKU      = */ "sfen lnsgkgsnl/1r7/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_HISYA     = */ "sfen lnsgkgsnl/7b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_HISYA_KYO = */ "sfen lnsgkgsn1/7b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_2         = */ "sfen lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_3         = */ "sfen lnsgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_4         = */ "sfen 1nsgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_5         = */ "sfen 2sgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_LEFT_5    = */ "sfen 1nsgkgs2/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_6         = */ "sfen 2sgkgs2/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_8         = */ "sfen 3gkg3/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_10        = */ "sfen 4k4/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
-			/*public static readonly string HANDICAP_PAWN3     = */ "sfen 4k4/9/9/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w 3p 1",
-		};
-
-		return start_sfens;
-	}
-
-	// "position"コマンドに設定できるsfen文字列を渡して、そこから全合法手で１手進めたsfen文字列を取得する。
-	std::vector<std::string> get_next_sfens(std::string root_sfen)
-	{
-		Position pos;
-		std::deque<StateInfo> si;
-		feed_position_string(pos, root_sfen, si);
-		StateInfo si2;
-		std::vector<std::string> sfens;
-
-		for (auto m : MoveList<LEGAL_ALL>(pos))
-		{
-			pos.do_move(m, si2);
-			sfens.emplace_back("sfen " + pos.sfen());
-			pos.undo_move(m);
-		}
-
-		return sfens;
-	}
-
-} // namespace Book
 } // namespace YaneuraOu

@@ -55,16 +55,9 @@ namespace Eval::NNUE {
 	Tools::Result ReadHeader(std::istream& stream,
 	    std::uint32_t* hash_value, std::string* architecture, std::uint32_t* version_out = nullptr);
 
-	// ヘッダを書き込む
-	bool WriteHeader(std::ostream& stream,
-	    std::uint32_t hash_value, const std::string& architecture);
-
 	// 評価関数パラメータを読み込む
 	// On a sidecar read failure, replace failed_file with its path.
 	Tools::Result ReadParameters(std::istream& stream, std::string* failed_file = nullptr);
-
-	// 評価関数パラメータを書き込む
-	bool WriteParameters(std::ostream& stream);
 
 } // namespace Eval::NNUE
 } // namespace YaneuraOu

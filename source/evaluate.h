@@ -29,16 +29,6 @@ namespace Eval {
 	// あるいは差分計算が不可能なときに呼び出される。
 	Value compute_eval(const Position& pos);
 
-	// 評価関数本体
-	// このあとのdo_move()のあとのevaluate()で差分計算ができるように、
-	// 現在の前局面から差分計算ができるときだけ計算しておく。
-	// 評価値自体は返さない。
-	// 備考) 差分計算型の評価関数ではないときは、この関数は何もしなくて良い。
-	void evaluate_with_no_return(const Position& pos);
-
-	// 評価値の内訳表示(デバッグ用)
-	void print_eval_stat(Position& pos);
-
 	// 評価関数パラメーターを読み込む。
 	// 時間のかかる評価関数の初期化処理はここに書くこと。
 	// これは、"isready"コマンドの応答時に(毎回)呼び出される。

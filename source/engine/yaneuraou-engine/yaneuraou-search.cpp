@@ -1613,44 +1613,6 @@ void YaneuraOuWorker::clear() {
 
 }
 
-// qsearch<PV>()をTT hitなし扱いで単独呼び出しするためのヘルパー。
-// qsearch内でStack::pvに構築されたPVをpvへ返すので、呼び出し側はこのPVをdo_move()して
-// qsearchのleaf node局面を得られる。通常探索のinfo pv表示のようにTTを辿ってPVを延長しない。
-Value YaneuraOuWorker::qsearch_pv(Position& pos, PVMoves& pv) {
-
-
-    nodes.store(0, std::memory_order_relaxed);
-    selDepth = 0;
-    lowPlyHistory.fill(98);
-    pv.clear();
-
-    // iterative_deepening()と同じ余白つきStack初期化。
-    Stack  stack[MAX_PLY + 10] = {};
-    Stack* ss                  = stack + 7;
-
-    for (int i = 7; i > 0; --i)
-    {
-        (ss - i)->continuationHistory =
-          &continuationHistory[0][0][NO_PIECE][0];
-        (ss - i)->continuationCorrectionHistory = &continuationCorrectionHistory[NO_PIECE][0];
-        (ss - i)->staticEval                    = VALUE_NONE;
-        (ss - i)->currentMove                   = Move::none();
-    }
-
-    for (int i = 0; i <= MAX_PLY + 2; ++i)
-        (ss + i)->ply = i;
-
-    ss->pv          = &pv;
-    ss->currentMove = Move::none();
-    ss->staticEval  = VALUE_NONE;
-    ss->ttPv        = false;
-    ss->ttHit       = false;
-
-    pos.set_ekr(main_manager()->search_options.enteringKingRule);
-
-    return qsearch<PV, false>(pos, ss, -VALUE_INFINITE, VALUE_INFINITE);
-}
-
 // -----------------------
 //      通常探索
 // -----------------------
