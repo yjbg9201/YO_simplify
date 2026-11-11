@@ -53,7 +53,6 @@ YaneuraOu.VC.VC.opendb
 x64/
 x86/
 build/
-!/tools/build/
 bld/
 [Bb]in/
 [Oo]bj/
@@ -249,3 +248,8 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
+
+# YO_simplify build outputs
+/obj/
+/source/YaneuraOu-by-gcc
+/source/YaneuraOu-by-gcc.exe

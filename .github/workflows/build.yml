@@ -1,0 +1,62 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04,     compiler: clang++, cpu: AVX2 }
+          - { os: ubuntu-24.04,     compiler: g++,     cpu: AVX2 }
+          - { os: ubuntu-24.04,     compiler: clang++, cpu: SSE42 }
+          - { os: ubuntu-24.04-arm, compiler: clang++, cpu: ARMV8 }
+          - { os: ubuntu-24.04-arm, compiler: clang++, cpu: ARMV8_DOTPROD }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld
+      - name: Build
+        run: make -C source -j4 normal TARGET_CPU=${{ matrix.cpu }} COMPILER=${{ matrix.compiler }}
+      - name: Bench
+        run: tools/check_bench.sh source/YaneuraOu-by-gcc
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make -C source -j4 normal TARGET_CPU=APPLEM1 COMPILER=clang++
+      - name: Bench
+        run: tools/check_bench.sh source/YaneuraOu-by-gcc
+
+  windows-msys2:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          install: make python mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld
+      - name: Build
+        run: make -C source -j4 normal TARGET_CPU=AVX2 COMPILER=clang++
+      - name: Bench
+        run: tools/check_bench.sh source/YaneuraOu-by-gcc.exe
+
+  windows-msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build
+        run: msbuild source\YaneuraOu.sln /m /p:Configuration=Release /p:Platform=x64
+      - name: Bench
+        shell: bash
+        run: tools/check_bench.sh build/YaneuraOu-Release.exe
