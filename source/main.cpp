@@ -35,10 +35,6 @@ int main(int argc, char* argv[])
 	// CommandLineにはglobal objectがあるので、これに設定しておく。
 	CommandLine::g.set_arg(argc, argv);
 
-	#if 0
-	// 起動直後にソフト名と作者の出力。
-    //std::cout << engine_info() << std::endl;
-	#endif
 	// 📌 やねうら王ではMultiEngineを採用しており、
 	//     このタイミングではエンジン名が確定しないから出力できない。
 

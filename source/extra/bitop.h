@@ -87,14 +87,8 @@ inline s32 POPCNT64(u64 a) { return __builtin_popcountll(a); }
 
 // SSE4.2有効でもPOPCNTが無効かもしれない環境のため、実装順位は下げる
 // 例: MacOS Apple M1 向けソフトウェアエミュレータ、AMD Bulldozer Family 15h core based CPU など
-#if defined (IS_64BIT)
 #define POPCNT32(a) _mm_popcnt_u32(a)
 #define POPCNT64(a) _mm_popcnt_u64(a)
-#else
-#define POPCNT32(a) _mm_popcnt_u32((u32)(a))
-// 32bit環境では32bitのpop_count 2回でemulation。
-#define POPCNT64(a) (POPCNT32((a)>>32) + POPCNT32(a))
-#endif
 
 #else
 
@@ -130,12 +124,7 @@ inline int32_t POPCNT64(uint64_t a) {
 // PEXT命令を使わず、この下にあるsoftware emulationによるPEXT実装を用いたほうがまだマシらしい。(どうなってんの…)
 
 static u32 PEXT32(u32 a, u32 b) { return _pext_u32((u32)(a), (u32)(b)); }
-#if defined (IS_64BIT)
 static u64 PEXT64(u64 a, u64 b) { return _pext_u64(a, b); }
-#else
-// PEXT32を2回使った64bitのPEXTのemulation
-static u64 PEXT64(u64 a, u64 b) { return u64(PEXT32((a) >> 32, (b) >> 32) << (u32)POPCNT32(b)) | u64(PEXT32(u32(a), u32(b))); }
-#endif
 
 #else
 
@@ -166,7 +155,6 @@ static u64 PEXT64(u64 a, uint64_t b) { return pext(a, b); }
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER) // && defined(_WIN64)
 
-#if defined (IS_64BIT)
 // 1である最下位のbitのbit位置を得る。0を渡してはならない。
 FORCE_INLINE int LSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward(&index, v); return index; }
 FORCE_INLINE int LSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward64(&index, v); return index; }
@@ -175,15 +163,6 @@ FORCE_INLINE int LSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _B
 FORCE_INLINE int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse(&index, v); return index; }
 FORCE_INLINE int MSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse64(&index, v); return index; }
 
-#else
-
-// 32bit環境では64bit版を要求されたら2回に分けて実行。
-FORCE_INLINE int LSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward(&index, v); return index; }
-FORCE_INLINE int LSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v) ? LSB32(uint32_t(v)) : 32 + LSB32(uint32_t(v >> 32)); }
-
-FORCE_INLINE int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse(&index, v); return index; }
-FORCE_INLINE int MSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v >> 32) ? 32 + MSB32(uint32_t(v >> 32)) : MSB32(uint32_t(v)); }
-#endif
 
 #elif defined(__GNUC__)
 
@@ -331,7 +310,7 @@ extern ymm ymm_one;   // all packed bytes are 1.
 
 // 最下位bitをresetする命令。
 
-#if defined(USE_AVX2) & defined(IS_64BIT)
+#if defined(USE_AVX2)
 // これは、BMI1の命令であり、ZEN1/ZEN2であっても使ったほうが速い。
 #define BLSR(x) _blsr_u64(x)
 #else

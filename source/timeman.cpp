@@ -64,13 +64,6 @@ void TimeManagement::init(const Search::LimitsType& limits,
     startTime = limits.startTime;
 
 	// TODO あとで
-#if 0
-    // reinit()が呼び出された時のために呼び出し条件を保存しておく。
-    lastcall_Limits = &limits;
-    lastcall_Us     = us;
-    lastcall_Ply    = ply;
-    lastcall_Opt    = const_cast<OptionsMap*>(&options);
-#endif
 
     init_(limits, us, ply, options, max_moves_to_draw);
 }
@@ -123,11 +116,9 @@ void TimeManagement::init_(const Search::LimitsType& limits,
 		// 終盤で大きく持ち時間を変えると、勝率が5割に寄ってしまうのでそれには注意。
 
 		auto r = limits.rtime;
-#if 1
 		// 指し手が進むごとに減衰していく曲線にする。
 		if (ply)
 			r += (int)prng.rand((int)std::min(r * 0.5f, r * 10.0f / (ply)));
-#endif
 
 		remain_time = minimumTime = optimumTime = maximumTime = r;
 		return;

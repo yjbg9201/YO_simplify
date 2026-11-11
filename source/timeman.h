@@ -121,14 +121,6 @@ class TimeManagement {
     bool      round_up_to_fullsecond;
 
 	// TODO : あとで
-#if 0
-    // 前回のinit()の値。
-	// このあとround_up()で用いるので保存しておく。
-    Search::LimitsType* lastcall_Limits;
-    Color               lastcall_Us;
-    int                 lastcall_Ply;
-    OptionsMap*         lastcall_Opt;
-#endif
 
 };
 

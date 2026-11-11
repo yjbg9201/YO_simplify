@@ -748,24 +748,6 @@ namespace SystemIO
 	// 引数で渡されるlinesは空であるを期待しているが、空でない場合は、そこに追加されていく。
 	Tools::Result ReadAllLines(const string& filename, vector<string>& lines, bool trim)
 	{
-#if 0
-		ifstream fs(filename);
-		if (fs.fail())
-			return 1; // 読み込み失敗
-
-		while (!fs.fail() && !fs.eof())
-		{
-			string line;
-			Dependency::getline(fs, line);
-			if (trim)
-				line = StringExtension::trim(line);
-			if (line.length())
-				lines.push_back(line);
-		}
-		fs.close();
-
-		return 0;
-#endif
 
 		// →　100MB程度のテキストファイルの読み込みにSurface Pro 6(Core i7モデル)で4秒程度かかる。
 		// ifstreamを使わない形で書き直す。これで4倍ぐらい速くなる。
@@ -892,7 +874,7 @@ namespace SystemIO
 	{
 #if defined(_MSC_VER)
 		return _ftelli64(f);
-#elif defined(__GNUC__) && defined(IS_64BIT) && !defined(__MACH__)
+#elif defined(__GNUC__) && !defined(__MACH__)
 		return ftello64(f);
 #else
 		return ftell(f);
@@ -903,7 +885,7 @@ namespace SystemIO
 	{
 #if defined(_MSC_VER)
 		return _fseeki64(f, offset, origin);
-#elif defined(__GNUC__) && defined(IS_64BIT) && !defined(__MACH__)
+#elif defined(__GNUC__) && !defined(__MACH__)
 		return fseeko64(f, offset, origin);
 #else
 		return fseek(f, offset, origin);

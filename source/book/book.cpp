@@ -656,12 +656,6 @@ namespace Book
 
 			// 手数違いの重複エントリーは、手数の一番若いほうだけをMemoryBook::write_book()で書き出すようにしたので、
 			// 以下のコードは不要(のはず)
-#if 0
-			// 一つ前のsfen文字列と、同一sfenエントリー内の手数の最小値
-			string last_sfen;
-			int last_sfen_ply = 0;
-			bool ignore_book_ply = options["IgnoreBookPly"];
-#endif
 
 			// 定跡に登録されている手数を無視するのか？
 			// (これがtrueならばsfenから手数を除去しておく)
@@ -692,25 +686,6 @@ namespace Book
 					if (ignoreBookPly)
 						StringExtension::trim_number_inplace(sfen); // 末尾の数字除去
 
-#if 0
-					if (ignore_book_ply)
-					{
-						int ply = StringExtension::to_int(StringExtension::mid(line, sfen.length() + 5), 0);
-
-						// options["IgnoreBookPly"] == trueのときに手数違いの重複エントリーがある場合がある。
-						// すでに見つけたentryなら、このentryに対して一切の操作を行わない。
-						// 若い手数のほうの局面情報を優先すべき。
-						// ※　定跡DBはsfen文字列順にソートされているので、手数違いのエントリーは連続していると仮定できる。
-
-						if (last_sfen != sfen)
-							last_sfen_ply = int_max;
-						else if (last_sfen_ply < ply)
-							sfen = "";
-
-						last_sfen_ply = std::min(last_sfen_ply,ply); // 同一sfenエントリーのなかでの最小値にする
-						last_sfen = sfen;
-					}
-#endif
 
 					continue;
 				}
@@ -1513,15 +1488,6 @@ namespace Book
 					//
 					// "position"コマンドでも千日手局面は弾かないし、この仕様は仕方ない意味はある。
 				}
-#if 0
-				else {
-					// GenerateAllLegalMovesがfalseの時は歩の不成での移動は非合法手扱いで、この時点で除去してこのあとの抽選を行う。
-					// 不成の指し手が選択されて、このあとrootMovesに登録されていないので定跡にhitしなかった扱いになってしまうのはもったいない。
-					legal &= rootPos.pseudo_legal(move);
-				}
-				// 🤔 このためにoptions["GenerateAllLegalMoves"]の設定値を渡すの面倒だし、
-				//     定跡でhitしたら成らずの指し手も指していいのでは？
-#endif
 
 				// 非合法手の排除
 				return !legal;

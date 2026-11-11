@@ -476,12 +476,6 @@ void Bitboards::init()
 			FOREACH_BR(horseEffect(ksq, Bitboard(ZERO)), horseEffect);
 			CheckCandidateBB[ksq][ROOK - 1][Us] = target & ~Bitboard(ksq);
 
-#if 0
-			// 王(24近傍が格納される)
-			target = Bitboard(ZERO);
-			FOREACH_KING(kingEffect(ksq), kingEffect);
-			CheckCandidateKingBB[ksq] = target & ~Bitboard(ksq);
-#endif
 		}
 
 	// 以下はBitboardとは関係はないが、Bitboardが初期化されていないと初期化できないので

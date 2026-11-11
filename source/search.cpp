@@ -28,13 +28,6 @@ Search::Worker::Worker(SharedState& sharedState,
 }
 
 // TODO : あとで
-#if 0
-void Search::Worker::ensure_network_replicated() {
-    // Access once to force lazy initialization.
-    // We do this because we want to avoid initialization during search.
-    (void) (networks[numaAccessToken]);
-}
-#endif
 
 // void Search::Worker::start_searching()
 // 💡　エンジン実装部で定義する。

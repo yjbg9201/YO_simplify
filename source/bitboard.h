@@ -272,7 +272,7 @@ template <int n>
 inline u64 Bitboard::extract64() const
 {
 	static_assert(n == 0 || n == 1, "");
-#if defined(USE_SSE41) && defined(IS_64BIT)
+#if defined(USE_SSE41)
 	return (u64)(_mm_extract_epi64(m, n));
 #else
 	return p[n];
@@ -283,7 +283,7 @@ template <int n>
 inline Bitboard& Bitboard::insert64(u64 u)
 {
 	static_assert(n == 0 || n == 1, "");
-#if defined(USE_SSE41) && defined(IS_64BIT)
+#if defined(USE_SSE41)
 	m = _mm_insert_epi64(m, u, n);
 	// ⇨ gcc/clangだと32bit環境で、この命令が定義されていなくてコンパイルエラーになる。
 	//		コンパイラ側のバグっぽい。仕方ないので、この命令を使うのは64bit環境の時のみにする。
@@ -531,12 +531,6 @@ static const Bitboard line_bb(Square sq1, Square sq2)
 	return BB_Table::LineBB[sq1][a[(int)Effect8::pop_directions(directions)]];
 }
 
-#if 0
-// →　高速化のために、Effect8::directions_ofを使って実装しているのでコメントアウト。(shogi.hにおいて)
-static bool aligned(Square s1, Square s2, Square s3) {
-	return LineBB[s1][s2] & s3;
-}
-#endif
 
 // sqの升にいる敵玉に王手となるc側の駒ptの候補を得るテーブル。第2添字は(pr-1)を渡して使う。
 // 直接アクセスせずに、check_candidate_bb()、around24_bb()を用いてアクセスすること。
@@ -567,20 +561,6 @@ static Bitboard pawn_drop_mask(const Bitboard& pawns) {
 	// 9段目だけ1にしたbitboardから、歩の升を引き算すると、桁借りで上位bit(9段目)が0になる。これを敷衍するという考えかた。
 	Bitboard t = left - pawns;
 
-#if 0
-	// 8回シフトで1段目に移動する。
-	t = (t & left) >> 8;
-
-	// tを 9段目が1になっているleftが引き算すると、
-	// 1) 1段目が1の時、9段目が0、1段目から8段目が1のBitboardになる。
-	// 2) 1段目が0の時、9段目が1、1段目から8段目は0のBitboardになる。
-	// ここにleftとxorすると、
-	// 1') 1段目が1の時、9段目が1、1段目から8段目が1のBitboardになる。= 1段目から9段目が1。
-	// 2') 1段目が0の時、9段目が0、1段目から8段目は0のBitboardになる。= 1段目から9段目が0。
-	// というように、tの内容が敷衍された。
-
-	return left ^ (left - t);
-#endif
 	// ↑これだと先後に関わらず1段目から9段目が1になる。
 	// 先手の時は1段目を1にしたくないし、後手の時は9段目を1にしたくない。
 	// そこで少し調整する必要がある。
@@ -797,63 +777,7 @@ inline Bitboard lanceEffect(Square sq, const Bitboard& occupied)
 	ASSERT_LV3(is_ok(C) && sq <= SQ_NB);
 
 	// Bitboard 128bitのまま操作する。
-#if 0
-// これは、Qugiyのアイデア。
-// Quigy[WCSC31]の手法 : cf. https://www.apply.computer-shogi.org/wcsc31/appeal/Qugiy/appeal.pdf
 
-	if (C == WHITE)
-	{
-		// 9段目が0、その他の升が1になっているmask。
-		const Bitboard mask(0x3fdfeff7fbfdfeffULL, 0x000000000001feffULL);
-
-		// 駒が存在しない升が1となるmaskを作る。ただし9段目は0固定。
-		Bitboard em = occupied.andnot(mask);
-
-		// emに歩を利きを足すと2進数の足し算の繰り上がりによって利きが届く升まで1になっていく。(縦型Bitboard特有)
-		// 
-		// 【図解】
-		//  0 0 1 ... 1 : 駒が存在しない升が1、駒がある場所が0となっているmask。
-		//          ↑最下位bitがsqの升を意味しているとする。
-		//
-		//            : sqの升に1加算する
-		// 
-		//  0 1 0 ... 0 : 2進数の足し算をした結果、左のようになる。
-		//    ↑利きが届いた一番先の升が1。そこまでの桁は0になる。
-		//
-		// この結果を元のmaskとxorすることにより、bitの値が変化した場所(差分)が検出できる。
-		// bitが変化した場所は、利きが届いたということだから、それこそが求める利きであった。
-
-		// 同様の考え方で、角の2方向と飛車の左と下方向の利きは求まる。
-		// 角の残り2方向は、byte reverseして同じ考え方を適用できる。
-		// 飛車の右方向もbyte reverseして同じ考え方を適用できる。
-		// 飛車の上方向はbyte reverseでは解決しないので先手の香の利きと合成する。(飛車の下方向も、後手の香の利きを合成した方が手っ取り早い)
-
-		Bitboard t = em + pawnEffect<C>(sq);
-
-		// tとemの差分が香の利き
-		return t ^ em;
-
-	}
-	else {
-
-		// step effectなのでここで返ってくるBitboardのsqの升は0であることが保証されている。
-		const Bitboard se = lanceStepEffect<C>(sq);
-
-		// 香の利きがあるかも知れない範囲に対して、駒がある升だけ1にする。
-		Bitboard mocc = se & occupied;
-
-		// 1を上方向に8升上書きコピーしてやる。これで、駒がある升より上は1になる。
-		// 1になっていない升が、香の利きが通っている升ということになる。
-		mocc |= mocc >> 1;
-		mocc |= mocc >> 2;
-		mocc |= mocc >> 4;
-		mocc >>= 1;
-
-		return mocc.andnot(se);
-	}
-#endif
-
-#if 1
 	// Qugiyのアルゴリズムを1～7筋と8～9筋に分けたもの。
 	// こうすることで飛車の縦利きのコードがちょっと短くなる。
 	if (C == WHITE)
@@ -913,7 +837,6 @@ inline Bitboard lanceEffect(Square sq, const Bitboard& occupied)
 			return Bitboard(0, mocc & se);
 		}
 	}
-#endif
 }
 
 // 香の利き、非template版。

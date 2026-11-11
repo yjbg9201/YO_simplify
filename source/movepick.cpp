@@ -247,17 +247,6 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
     if constexpr (Type == QUIETS || Type == QUIETS_ALL)
 	{
 
-#if 0
-		// 🌈　Stockfishのコードを忠実に実装すると将棋ではたくさんの利きを計算しなくてはならないので
-		//     非常に計算コストが高くなる。ここでは歩による当たりになっている駒だけ考える。
-
-		// 歩による脅威だけ。
-		// squares threatened by pawns
-		threatenedByPawn = (~us == BLACK) ? pos.attacks_by<BLACK, PAWN>() : pos.attacks_by<WHITE, PAWN>();
-
-		// 歩以外の自駒で、相手の歩の利きにある駒
-		threatened =  (pos.pieces(us,PAWN).andnot(pos.pieces(us))                 & threatenedByPawn );
-#endif
 		// →　やってみたが強くならないのでコメントアウトする。[2022/04/26]
 
 	}

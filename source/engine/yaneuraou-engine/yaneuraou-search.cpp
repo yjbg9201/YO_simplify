@@ -549,11 +549,6 @@ Search::YaneuraOuWorker::YaneuraOuWorker(SharedState& sharedState,
 
 void Search::YaneuraOuWorker::ensure_network_replicated() {
 	// TODO : あとで評価関数を実装する。
-	#if 0
-    // Access once to force lazy initialization.
-    // We do this because we want to avoid initialization during search.
-    (void) (networks[numaAccessToken]);
-	#endif
 }
 
 void Search::YaneuraOuWorker::pre_start_searching() {
@@ -1199,12 +1194,6 @@ bool Search::YaneuraOuWorker::iterative_deepening() {
             alpha     = std::max(avg - delta, -VALUE_INFINITE);
             beta      = std::min(avg + delta,  VALUE_INFINITE);
 
-#if 0
-            // Adjust optimism based on root move's averageScore
-            // ルート手の averageScore に基づいて楽観度を調整する
-			optimism[us]  = 137 * avg / (std::abs(avg) + 91);
-            optimism[~us] = -optimism[us];
-#endif
 
 			// 🤔 このoptimismは、StockfishのNNUE評価関数で何やら使っているようなのだが…。
             //     TODO : あとで検討する。
@@ -2140,33 +2129,7 @@ Value YaneuraOuWorker::search(Position& pos, Stack* ss, Value alpha, Value beta,
 
         // 🤔 比較してみたが、これを有効にするとR10ぐらい弱くなるっぽい。
         //     全体を調整してからまた考える。
-#if 0
-		if (pos.rule50_count() < 96)
-        {
-            // TODO : 将棋でもこの処理必要なのか？
-
-            if (depth >= 8 && ttData.move
-                && pos.pseudo_legal(ttData.move, search_options.generate_all_legal_moves)
-				&& pos.legal(ttData.move)
-                && !is_decisive(ttData.value))
-            {
-                pos.do_move(ttData.move, st);
-                HASH_KEY nextPosKey                        = pos.hash_key();
-				auto [ttHitNext, ttDataNext, ttWriterNext] = tt.probe(nextPosKey, pos);
-                pos.undo_move(ttData.move);
-
-                // Check that the ttValue after the tt move would also trigger a cutoff
-                if (!is_valid(ttDataNext.value))
-                    return ttData.value;
-                if ((ttData.value >= beta) == (-ttDataNext.value >= beta))
-                    return ttData.value;
-            }
-            else
-                return ttData.value;
-        }
-#else
         return ttData.value;
-#endif        
     }
 
 	// -----------------------
@@ -3807,13 +3770,6 @@ Value Search::YaneuraOuWorker::qsearch(Position& pos, Stack* ss, Value alpha, Va
     }
 
 // TODO : あとで検討する。
-#if 0
-	// 16手以内の循環になってないのにqsearchで16手も延長している場合、
-    // 置換表の指し手だけで長い循環になっている可能性が高く、
-    // これは引き分け扱いにしてしまう。
-    if (depth <= -16)
-        return draw_value(REPETITION_DRAW, us);
-#endif
 
     // 最大手数の到達
     if (ss->ply >= MAX_PLY || pos.game_ply() > search_options.max_moves_to_draw)
@@ -3975,12 +3931,6 @@ Value Search::YaneuraOuWorker::qsearch(Position& pos, Stack* ss, Value alpha, Va
             ss->staticEval = bestValue =
 				to_corrected_static_eval(unadjustedStaticEval, correctionValue);
 
-#if 0       // 以前のコード
-            unadjustedStaticEval =
-              (ss - 1)->currentMove != Move::null()
-                ? evaluate(pos)
-                : -(ss - 1)->staticEval;
-#endif
 
         }
 

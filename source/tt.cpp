@@ -14,7 +14,6 @@
 #include "engine.h"
 
 // やねうら王独自拡張
-#include "extra/key128.h"
 
 namespace YaneuraOu {
 
@@ -192,11 +191,7 @@ TTWriter::TTWriter(TTEntry* tte) :
 void TTWriter::write(
   const Key k_, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8) {
 
-#if HASH_KEY_BITS <= 64
     const TTE_KEY_TYPE k = TTE_KEY_TYPE(k_);
-#else
-    const TTE_KEY_TYPE k = TTE_KEY_TYPE(k_.extract64<1>());
-#endif
 
     entry->save(k, v, pv, b, d, m, ev, generation8);
 }
@@ -223,15 +218,13 @@ void TTWriter::write(
 // TT_CLUSTER_SIZE == 6のとき、TTEntry 16bytes×6つ + 0(padding) =  96bytes
 // TT_CLUSTER_SIZE == 8のとき、TTEntry 16bytes×8つ + 0(padding) = 128bytes
 
-static constexpr int ClusterSize = TT_CLUSTER_SIZE;
+static constexpr int ClusterSize = 3;
 
 struct Cluster {
 	TTEntry entry[ClusterSize];
 
-#if TT_CLUSTER_SIZE == 3
 	char    padding[2];  // Pad to 32 bytes
 						 // 全体を32byteぴったりにするためのpadding
-#endif
 };
 
 // static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");
@@ -297,24 +290,6 @@ void TranspositionTable::clear(ThreadPool& threads) {
 	generation8 = 0;
 
 	// Stockfishのコード
-#if 0
-	const size_t threadCount = threads.num_threads();
-
-	for (size_t i = 0; i < threadCount; ++i)
-	{
-		threads.run_on_thread(i, [this, i, threadCount]() {
-			// Each thread will zero its part of the hash table
-			const size_t stride = clusterCount / threadCount;
-			const size_t start = stride * i;
-			const size_t len = i + 1 != threadCount ? stride : clusterCount - start;
-
-			std::memset(&table[start], 0, len * sizeof(Cluster));
-			});
-	}
-
-	for (size_t i = 0; i < threadCount; ++i)
-		threads.wait_on_thread(i);
-#endif
 
 	auto size = clusterCount * sizeof(Cluster);
 
@@ -371,11 +346,7 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key, cons
 
     TTEntry* const tte = first_entry(key, pos.side_to_move());
 
-#if HASH_KEY_BITS <= 64
     const TTE_KEY_TYPE key_for_ttentry = TTE_KEY_TYPE(key);
-#else
-    const TTE_KEY_TYPE key_for_ttentry = TTE_KEY_TYPE(key.extract64<1>());
-#endif
 
 	// Use the low 16 bits as key inside the cluster
 	// クラスター内で下位16ビットをキーとして使用します

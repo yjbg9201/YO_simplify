@@ -73,10 +73,13 @@ void Position::init() {
         auto r2 = rng.rand<Key64>();
         auto r3 = rng.rand<Key64>();
         auto r4 = rng.rand<Key64>();
-        SET_HASH(h, r1, r2, r3, r4);
+        // ⚠ 64bit keyではr1しか使わないが、Zobrist乱数の値をやねうら王と同一に保つために
+        //    乱数は1つのkeyにつき4回消費しなければならない。
+        h = r1;
+        (void) r2; (void) r3; (void) r4;
     };
 
-	SET_HASH(Zobrist::zero, 0, 0, 0, 0);
+	Zobrist::zero = 0;
 
 	set_rand(Zobrist::side);
 
@@ -145,33 +148,14 @@ inline void remove_piece_for_partial_key(StateInfo* st, Piece pc, Square s) {
 // ----------------------------------
 
 // Pieceを綺麗に出力する(USI形式ではない) 先手の駒は大文字、後手の駒は小文字、成り駒は先頭に+がつく。盤面表示に使う。
-#if !defined (PRETTY_JP)
-std::string pretty(Piece pc) { return std::string(USI_PIECE).substr(pc * 2, 2); }
-#else
 // "□"(四角)は文字フォントによっては半分の幅しかない。"口"(くち)にする。
 std::string USI_PIECE_KANJI[] = {
 	" 口"," 歩"," 香"," 桂"," 銀"," 角"," 飛"," 金"," 玉"," と"," 杏"," 圭"," 全"," 馬"," 龍"," 菌"," 王",
 		  "^歩","^香","^桂","^銀","^角","^飛","^金","^玉","^と","^杏","^圭","^全","^馬","^龍","^菌","^王"
 };
 std::string pretty(Piece pc) {
-#if 1
 	return USI_PIECE_KANJI[pc];
-#else
-	// 色を変えたほうがわかりやすい。Linuxは簡単だが、MS-DOSは設定が面倒。
-	// Linux : https://qiita.com/dojineko/items/49aa30018bb721b0b4a9
-	// MS-DOS : https://one-person.hatenablog.jp/entry/2017/02/23/125809
-
-	std::string result;
-	if (pc != NO_PIECE)
-		result = (color_of(pc) == BLACK) ? "\\e[32;40;1m" : "\\e[33;40;1m";
-	result += USI_PIECE_KANJI[pc];
-	if (pc != NO_PIECE)
-		result += "\\e[m";
-
-	return result;
-#endif
 }
-#endif
 
 
 
@@ -812,17 +796,10 @@ const std::string Position::flipped_sfen(int gamePly_) const
 // sfen文字列をflip(先後反転)したsfen文字列に変換する。
 const std::string Position::sfen_to_flipped_sfen(std::string sfen)
 {
-#if 1
 	Position pos;
 	StateInfo si;
 	pos.set(sfen, &si);
 	return pos.flipped_sfen();
-#else
-	// この局面クラスを利用せず文字列操作だけで求めて返す。
-	// https://yaneuraou.yaneu.com/2023/12/15/chatgpt-wrote-a-program-to-flip-a-shogi-board/
-
-	// 文字列操作だけで書く。あとで書くかも。
-#endif
 }
 
 
@@ -877,16 +854,8 @@ std::ostream& operator<<(std::ostream& os, const Position& pos)
 		os << endl;
 	}
 
-#if !defined (PRETTY_JP)
-	// 手駒
-	os << "BLACK HAND : " << pos.hand[BLACK] << " , WHITE HAND : " << pos.hand[WHITE] << endl;
-
-	// 手番
-	os << "Turn = " << pos.sideToMove << endl;
-#else
 	os << "先手 手駒 : " << pos.hand[BLACK] << " , 後手 手駒 : " << pos.hand[WHITE] << endl;
 	os << "手番 = " << pos.sideToMove << endl;
-#endif
 
 	// sfen文字列もおまけで表示させておく。(デバッグのときに便利)
 	os << "sfen " << pos.sfen() << endl;
@@ -1621,7 +1590,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
         // 王手している駒のbitboardを更新する。
         if (givesCheck)
         {
-#if 1
             // 高速化のために差分更新する時用
 
             const StateInfo* prevSt = st->previous;
@@ -1657,10 +1625,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
             // 差分更新したcheckersBBが正しく更新されているかをテストするためのassert
             ASSERT_LV3(st->checkersBB == attackers_to<Us>(square<KING>(them)));
-#else
-            // 差分更新しないとき用。(デバッグ等の目的で用いる)
-            st->checkersBB = attackers_to<Us>(square<KING>(Them));
-#endif
             // 手番側は2手前のものからの継続。
             st->continuousCheck[Us] += 2;
         }
@@ -2293,21 +2257,6 @@ bool Position::see_ge(Move m, Value threshold) const
 //      千日手判定
 // ----------------------------------
 
-#if 0
-// Tests whether the position is drawn by 50-move rule
-// or by repetition. It does not detect stalemates.
-// この処理は、局面が50手ルールまたは繰り返しによって
-// 引き分けになっているかどうかをテストします。ステイルメイトは検出されません。
-bool Position::is_draw(int ply) const {
-
-    if (st->rule50 > 99 && (!checkers() || MoveList<LEGAL>(*this).size()))
-        return true;
-
-    // Return a draw score if a position repeats once earlier but strictly
-    // after the root, or repeats twice before or at the root.
-    return st->repetition && st->repetition < ply;
-}
-#endif
 
 // 連続王手の千日手等で引き分けかどうかを返す
 RepetitionState Position::is_repetition(int ply) const

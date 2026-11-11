@@ -134,11 +134,7 @@ class FeatureTransformer {
 	// Number of input/output dimensions
 	// 入出力の次元数
 	static constexpr IndexType kInputDimensions  = RawFeatures::kDimensions;
-#if defined(USE_ELEMENT_WISE_MULTIPLY)
-	static constexpr IndexType kOutputDimensions = kHalfDimensions;
-#else
 	static constexpr IndexType kOutputDimensions = kHalfDimensions * 2;
-#endif
 
 	// Size of forward propagation buffer
 	// 順伝播用バッファのサイズ
@@ -160,19 +156,9 @@ class FeatureTransformer {
 	// Read network parameters
 	// パラメータを読み込む
 	Tools::Result ReadParameters(std::istream& stream) {
-#if defined(USE_ELEMENT_WISE_MULTIPLY)
-		read_leb_128<BiasType>(stream, biases_, kHalfDimensions);
-		read_leb_128<WeightType>(stream, weights_, kHalfDimensions * kInputDimensions);
-
-#if defined(VECTOR)
-		permute_weights(inverse_order_packs);
-#endif
-		scale_weights(true);
-#else
 		for (std::size_t i = 0; i < kHalfDimensions; ++i) biases_[i] = read_little_endian<BiasType>(stream);
 		for (std::size_t i = 0; i < kHalfDimensions * kInputDimensions; ++i)
 			weights_[i] = read_little_endian<WeightType>(stream);
-#endif
 		return !stream.fail() ? Tools::ResultCode::Ok : Tools::ResultCode::FileReadError;
 	}
 
@@ -212,80 +198,6 @@ class FeatureTransformer {
 		EnsureAccumulator(pos, refresh);
 		const auto& accumulation = pos.state()->accumulator.accumulation;
 
-#if defined(USE_ELEMENT_WISE_MULTIPLY)
-
-#if defined(VECTOR)
-			// Packed output is sizeof(vec_t) bytes for each SIMD register
-#if defined(USE_AVX512)
-			constexpr IndexType OutputChunkSize = 64;
-#else
-			constexpr IndexType OutputChunkSize = kSimdWidth;
-#endif
-		static_assert((kHalfDimensions / 2) % OutputChunkSize == 0);
-		constexpr IndexType NumOutputChunks = kHalfDimensions / 2 / OutputChunkSize;
-
-		vec_t Zero = vec_zero();
-		vec_t One = vec_set_16(127 * 2);
-
-		const Color perspectives[2] = { pos.side_to_move(), ~pos.side_to_move() };
-		for (IndexType p = 0; p < 2; ++p) {
-			const IndexType offset = (kHalfDimensions / 2) * p;
-
-			const vec_t* in0 = reinterpret_cast<const vec_t*>(&(accumulation[perspectives[p]][0][0]));
-			const vec_t* in1 = reinterpret_cast<const vec_t*>(&(accumulation[perspectives[p]][0][kHalfDimensions / 2]));
-			vec_t* out = reinterpret_cast<vec_t*>(output + offset);
-
-			constexpr int shift =
-#if defined(USE_SSE2)
-				7;
-#else
-				6;
-#endif
-
-			for (IndexType j = 0; j < NumOutputChunks; ++j)
-			{
-				const vec_t sum0a =
-					vec_slli_16(vec_max_16(vec_min_16(in0[j * 2 + 0], One), Zero), shift);
-				const vec_t sum0b =
-					vec_slli_16(vec_max_16(vec_min_16(in0[j * 2 + 1], One), Zero), shift);
-				const vec_t sum1a = vec_min_16(in1[j * 2 + 0], One);
-				const vec_t sum1b = vec_min_16(in1[j * 2 + 1], One);
-
-				const vec_t pa = vec_mulhi_16(sum0a, sum1a);
-				const vec_t pb = vec_mulhi_16(sum0b, sum1b);
-
-				out[j] = vec_packus_16(pa, pb);
-			}
-
-		}
-
-#else
-		constexpr int shift =
-#if defined(VECTOR) && !defined(USE_SSE2)
-			6;
-#else
-			7;
-#endif
-
-		const Color perspectives[2] = { pos.side_to_move(), ~pos.side_to_move() };
-		for (IndexType p = 0; p < 2; ++p) {
-			const IndexType offset = (kHalfDimensions / 2) * p;
-
-			for (IndexType j = 0; j < kHalfDimensions / 2; ++j)
-			{
-				BiasType sum0 = accumulation[perspectives[p]][0][j];
-				BiasType sum1 = accumulation[perspectives[p]][0][j + kHalfDimensions / 2];
-				sum0 = std::clamp<BiasType>(sum0, 0, 127 * 2);
-				sum1 = std::clamp<BiasType>(sum1, 0, 127 * 2);
-				const int product = (int(sum0) << shift) * int(sum1);
-				const int value = product >> 16;
-				output[offset + j] = static_cast<OutputType>(std::clamp(value, 0, 255));
-			}
-
-		}
-#endif
-
-#else
 
 		// 以下は旧NNUEのコード。
 		// ループ本体がx86とNEONで異なる（2入力→1出力 vs 1入力→1出力）ため、
@@ -398,7 +310,6 @@ class FeatureTransformer {
 			}
 #endif
 		}
-#endif
 	}
 
    private:

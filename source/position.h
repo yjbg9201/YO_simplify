@@ -13,7 +13,6 @@
 
 #include "eval/nnue/nnue_accumulator.h"
 
-#include "extra/key128.h"
 #include "misc.h"
 
 namespace YaneuraOu {
