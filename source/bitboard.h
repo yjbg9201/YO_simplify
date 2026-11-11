@@ -260,8 +260,6 @@ struct alignas(16) Bitboard
 		while (p1) { t( (Square)(pop_lsb(p1) + 63),1); }
 	}
 
-	// UnitTest
-	static void UnitTest(Test::UnitTester& tester, IEngine& engine);
 };
 
 // 抑制していた警告を元に戻す。
@@ -423,8 +421,6 @@ struct alignas(32) Bitboard256
 	// 保持している2つの盤面を重ね合わせた(ORした)Bitboardを返す。
 	Bitboard merge() const;
 
-	// UnitTest
-	static void UnitTest(Test::UnitTester& tester, IEngine& engine);
 };
 
 inline bool Bitboard256::operator == (const Bitboard256& rhs) const
@@ -555,17 +551,6 @@ static const Bitboard check_candidate_bb(Color us, PieceType pr, Square sq)
 	return BB_Table::CheckCandidateBB[sq][pr - 1][us];
 }
 
-#if defined(LONG_EFFECT_LIBRARY) // 詰みルーチンでは使わなくなったが、LONG_EFFECT_LIBRARYのなかで使っている。
-
-namespace BB_Table { extern Bitboard CheckCandidateKingBB[SQ_NB_PLUS1]; }
-
-// ある升の24近傍のBitboardを返す。
-static const Bitboard around24_bb(Square sq)
-{
-	ASSERT_LV3(sq <= SQ_NB);
-	return BB_Table::CheckCandidateKingBB[sq];
-}
-#endif
 
 // 歩が打てる筋が1になっているBitboardを返す。
 // pawns : いま歩を打とうとしている手番側の歩のBitboard

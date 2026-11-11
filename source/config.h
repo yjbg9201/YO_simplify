@@ -517,9 +517,6 @@ constexpr bool pretty_jp = false;
 // --- PolicyBook
 
 // PolicyBookを使うときは、hash keyを128bitにする。局面のhash keyが衝突してしまうとまずいので…。
-#if defined(USE_POLICY_BOOK)
-#define HASH_KEY_BITS 128
-#endif
 
 // --- hash key bits and TT_CLUSTER_SIZE
 
@@ -546,9 +543,6 @@ constexpr bool pretty_jp = false;
 
 // KIF形式に変換するときにPositionクラスにその局面へ至る直前の指し手が保存されていないと
 // "同"金のように出力できなくて困る。
-#if defined (USE_KIF_CONVERT_TOOLS)
-	#define KEEP_LAST_MOVE
-#endif
 
 // ----------------------------
 //      CPU environment

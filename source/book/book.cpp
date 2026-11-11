@@ -1860,48 +1860,6 @@ namespace Book
 	}
 
 
-	// 定跡部のUnitTest
-	void UnitTest(Test::UnitTester& tester, IEngine& engine)
-	{
-		// 少し書こうとしたが、ファイルから読み込むテストでないと大したテストにならないので考え中。
-#if 0
-		auto s1 = tester.section("Book");
-
-		// Search::Limitsのalias
-		auto& limits = Search::Limits;
-
-		Position pos;
-		StateInfo si;
-
-		// 平手初期化
-		auto hirate_init = [&] { pos.set_hirate(&si); };
-
-		{
-			// Bookのprobeのテスト
-			auto s2 = tester.section("probe");
-			MemoryBook book;
-
-			limits.generate_all_legal_moves = true;
-
-			tester.test("pawn's unpromoted move", true);
-		}
-#endif
-
-		// BookToolsのテスト
-		auto s1 = tester.section("BookTools");
-
-		Position pos;
-		std::string root_sfen = "startpos moves 7g7f 3c3d 6g6f 8b3b 8h7g 5a6b 2h8h 6b7b 8g8f 3d3e 8f8e 3e3f 3i2h 3f3g+ 2h3g 3a4b 4i3h P*3f 3g2h 4b3c 6i5h 3c4d 7i6h 1c1d P*3g 7a8b";
-		std::deque<StateInfo> si;
-		BookTools::feed_position_string(pos, root_sfen, si, [](Position&,Move){});
-
-		std::string moves1 = "1g1f 2g2f 3g3f 4g4f 5g5f 6f6e 7f7e 8e8d 9g9f 1i1h 9i9h 2h3i 6h6g 6h7i 7g8f 7g9e 8h7h 8h8f 8h8g 8h9h 3h3i 3h4h 5h4h 5h6g 5i4h 5i4i 5i6i";
-		std::string moves2 = std::string();
-		for(auto m : MoveList<LEGAL_ALL>(pos))
-			moves2 += (moves2.empty() ? "" : " ") + to_usi_string(Move(m));
-
-		tester.test("feed_position_string" , moves1 == moves2);
-	}
 }
 
 // ===================================================

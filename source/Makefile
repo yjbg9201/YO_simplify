@@ -323,31 +323,19 @@ SOURCES  = \
 	tune.cpp                                                                   \
 	book/book.cpp                                                              \
 	book/apery_book.cpp                                                        \
-	book/policybook.cpp                                                        \
 	extra/bitop.cpp                                                            \
-	extra/long_effect.cpp                                                      \
 	extra/sfen_packer.cpp                                                      \
 	mate/mate.cpp                                                              \
 	mate/mate1ply_without_effect.cpp                                           \
-	mate/mate1ply_with_effect.cpp                                              \
-	mate/mate_solver.cpp                                                       \
 	eval/evaluate_bona_piece.cpp                                               \
 	eval/evaluate.cpp                                                          \
 	eval/evaluate_io.cpp                                                       \
-	eval/evaluate_mir_inv_tools.cpp                                            \
-	testcmd/unit_test.cpp                                                      \
-	testcmd/mate_test_cmd.cpp                                                  \
-	testcmd/normal_test_cmd.cpp                                                
+	eval/evaluate_mir_inv_tools.cpp
 
 CUDA_SOURCES =
 
 OBJC_SOURCES =
 
-ifeq (,)
-	SOURCES  +=                                                                \
-		book/makebook.cpp                                                      \
-		book/makebook2025.cpp
-endif
 
 ifneq (,$(IS_NNUE_EDITION))
 	ifeq ($(ENGINE_ARCH_UPPER),NNUE)
@@ -396,7 +384,6 @@ ifneq (,$(IS_NNUE_EDITION))
 	# 大して大きなファイルではないので全部してしまう。
 	SOURCES += \
 		eval/nnue/evaluate_nnue.cpp                                     \
-		eval/nnue/nnue_test_command.cpp                                 \
 		eval/nnue/features/k.cpp                                        \
 		eval/nnue/features/p.cpp                                        \
 		eval/nnue/features/a2.cpp                                       \

@@ -5,7 +5,6 @@
 #include "../position.h"
 #include "../misc.h"
 #include "../usi.h"
-#include "../testcmd/unit_test.h"
 
 #include <memory>
 #include <unordered_map>
@@ -386,8 +385,6 @@ protected:
 	OptionsMapRef options;
 };
 
-// 定跡部のUnitTest
-void UnitTest(Test::UnitTester& tester, IEngine& engine);
 }
 
 // 定跡関係の処理のための補助ツール群

@@ -15,7 +15,6 @@
 
 // やねうら王独自拡張
 #include "extra/key128.h"
-#include "testcmd/unit_test.h"
 
 namespace YaneuraOu {
 
@@ -480,55 +479,6 @@ TTEntry* TranspositionTable::first_entry(const Key& key_, Color side_to_move) co
 	return &table[(index & ~1) | side_to_move].entry[0];
 
 #endif
-}
-
-// ----------------------------------
-//			UnitTest
-// ----------------------------------
-
-void TranspositionTable::UnitTest(Test::UnitTester& unittest, IEngine& engine)
-{
-	auto section1 = unittest.section("TT");
-	{
-		TranspositionTable tt;
-
-		// 1024[MB]確保
-		tt.resize(1024,engine.get_threads());
-		tt.clear(engine.get_threads());
-
-		auto section2 = unittest.section("probe()");
-		Position pos;
-		StateInfo si;
-		pos.set_hirate(&si);
-
-		Key posKey = pos.key();
-		auto [ttHit, ttData, ttWriter] = tt.probe(posKey, pos);
-		for (int i = 0; i < 10; ++i)
-		{
-			Value v = Value(i*100-500);
-			bool pv = (i % 2) != 0;
-			Bound b = BOUND_LOWER;
-			Depth d = 16 + i;
-			Move m = make_move(SQ_77, SQ_76, BLACK, PAWN);
-			Value ev = Value(i*200-1000);
-			int g = 5;
-			ttWriter.write(posKey, v, pv, b, d, m, ev, g);
-
-			auto [ttHit, ttData, ttWriter] = tt.probe(posKey, pos);
-			bool ok = true;
-			ok &= ttHit;
-			if (ttHit)
-			{
-				ok &= ttData.value == v;
-				ok &= ttData.is_pv == pv;
-				ok &= ttData.bound == b;
-				ok &= ttData.depth == d;
-				ok &= ttData.move  == m;
-				ok &= ttData.eval  == ev;
-			}
-			unittest.test("write & probe", ok);
-		}
-	}
 }
 
 } // namespace YaneuraOu

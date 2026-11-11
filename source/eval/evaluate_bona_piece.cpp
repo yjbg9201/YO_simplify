@@ -73,19 +73,12 @@ namespace Eval {
         { f_king, e_king },
 
     // 通常の場合（金と小駒の成り駒を区別しない場合）
-    #if !defined (DISTINGUISH_GOLDS)
         { f_gold, e_gold }, // 成歩
         { f_gold, e_gold }, // 成香
         { f_gold, e_gold }, // 成桂
         { f_gold, e_gold }, // 成銀
 
     // 金と小駒の成り駒を区別する場合
-    #else
-        { f_pro_pawn, e_pro_pawn },     // 成歩
-        { f_pro_lance, e_pro_lance },   // 成香
-        { f_pro_knight, e_pro_knight }, // 成桂
-        { f_pro_silver, e_pro_silver }, // 成銀
-    #endif
 
         { f_horse, e_horse }, // 馬
         { f_dragon, e_dragon }, // 龍
@@ -103,19 +96,12 @@ namespace Eval {
         { e_king, f_king },
 
     // 通常の場合（金と小駒の成り駒を区別しない場合）
-    #if !defined (DISTINGUISH_GOLDS)
         { e_gold, f_gold }, // 成歩
         { e_gold, f_gold }, // 成香
         { e_gold, f_gold }, // 成桂
         { e_gold, f_gold }, // 成銀
 
     // 金と小駒の成り駒を区別する場合
-    #else
-        { e_pro_pawn, f_pro_pawn },     // 成歩
-        { e_pro_lance, f_pro_lance },   // 成香
-        { e_pro_knight, f_pro_knight }, // 成桂
-        { e_pro_silver, f_pro_silver }, // 成銀
-    #endif
 
         { e_horse, f_horse }, // 馬
         { e_dragon, f_dragon }, // 龍

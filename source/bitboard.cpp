@@ -1,7 +1,5 @@
 ﻿#include "bitboard.h"
-#include "extra/long_effect.h"
 #include "mate/mate.h"
-#include "testcmd/unit_test.h"
 #include "misc.h"
 
 #include <sstream>
@@ -90,9 +88,6 @@ namespace BB_Table
 
 	Bitboard CheckCandidateBB[SQ_NB_PLUS1][KING - 1][COLOR_NB];
 
-#if defined(LONG_EFFECT_LIBRARY) // 詰みルーチンでは使わなくなったが、LONG_EFFECT_LIBRARYのなかで使っている。
-	Bitboard CheckCandidateKingBB[SQ_NB_PLUS1];
-#endif
 
 	Bitboard BetweenBB[785];
 	u16 BetweenIndex[SQ_NB_PLUS1][SQ_NB_PLUS1];
@@ -494,9 +489,6 @@ void Bitboards::init()
 
 	// 9. LONG_EFFECT_LIBRARYの初期化
 
-#if defined (LONG_EFFECT_LIBRARY)
-	LongEffect::init();
-#endif
 
 	// 10. 1手詰めテーブルの初期化
 	Mate::init();
@@ -935,220 +927,6 @@ Bitboard directEffect(Square sq, Effect8::Direct d, const Bitboard& occupied)
 	case Effect8::DIRECT_L  : return rayEffect<Effect8::DIRECT_L >(sq, occupied);
 	case Effect8::DIRECT_LD : return rayEffect<Effect8::DIRECT_LD>(sq, occupied);
 	default: UNREACHABLE; return Bitboard(ZERO);
-	}
-}
-
-// UnitTest
-void Bitboard::UnitTest(Test::UnitTester& tester, IEngine& engine)
-{
-	//Bitboard b(SQ_75);
-	//cout << lanceEffect<WHITE>(SQ_71, b) << endl;
-	//cout << lanceEffect<WHITE>(SQ_72, b) << endl;
-
-	auto section1 = tester.section("Bitboard");
-
-	{
-		// SQの升のbitを立てて、それがちゃんと読み取れるかのテスト
-		bool all_ok = true;
-		for (Rank r = RANK_1; r <= RANK_9; ++r)
-			for (File f = FILE_1; f <= FILE_9; ++f)
-			{
-				Square sq = f | r;
-				Bitboard b(sq);
-				all_ok &= b.test(sq);    // そのbitが立っているか
-				all_ok &= b.pop() == sq; // 1の立っているbitをもらえば、その升であるか。
-			}
-		tester.test("sq occupied", all_ok);
-	}
-	{
-		// ByteReverseがちゃんと機能しているかのテスト
-
-		Bitboard b(0x0123456789abcdef, 0xfedcba9876543210);
-		Bitboard r = b.byte_reverse();
-
-		tester.test("byte_reverse", r.extract64<0>() == 0x1032547698badcfe && r.extract64<1>() == 0xefcdab8967452301);
-	}
-	{
-		// 9段目が0、そこ以外が1のmask(香の利きを求めるコードのなかで使っている)
-		Bitboard mask(0x3fdfeff7fbfdfeffULL , 0x000000000001feffULL);
-
-		tester.test("RANK9_BB", RANK9_BB == ~mask);
-	}
-
-	{
-		// 駒の利き
-
-		bool all_ok = true;
-
-		// 何も駒のない盤面上に駒ptを55に置いた時の利きの数。
-		int p0_table[] = {
-			0,1,4,2,5,16,16,6,	// Empty、歩、香、桂、銀、角、飛、金
-			8,6,6,6,6,20,20,6,	// 玉、と、…
-		};
-		// 駒が敷き詰められた盤面上で駒ptを55に置いた時の利きの数。
-		int p1_table[] = {
-			0,1,1,2,5, 4, 4,6,	// Empty、歩、香、桂、銀、角、飛
-			8,6,6,6,6, 8, 8,6,	// 玉、と、…
-		};
-
-		for (Color c : COLOR)
-			for (PieceType pt = PAWN ; pt < PIECE_TYPE_NB ; ++pt )
-			{
-				Piece pc = make_piece(c, pt);
-				Bitboard bb0 = effects_from(pc, SQ_55, Bitboard(ZERO));
-				int p0 = bb0.pop_count();
-				Bitboard bb1 = effects_from(pc, SQ_55, Bitboard(1));
-				int p1 = bb1.pop_count();
-				bool ok0 = (p0 == p0_table[(int)pt]);
-				if (!ok0)
-				{
-					cout << "Effect " << pc  << "(" << pretty(pc) << ")" << " on SQ_55 in Bitboard(ZERO) , pop_count = " << p0 << endl;
-					cout << bb0 << endl;
-				}
-				bool ok1 = (p1 == p1_table[(int)pt]);
-				if (!ok1)
-				{
-					cout << "Effect " << pc  << "(" << pretty(pc) << ")" << " on SQ_55 in Bitboard(1) , pop_count = " << p1 << endl;
-					cout << bb1 << endl;
-				}
-				all_ok &= ok0 & ok1;
-			}
-		tester.test("effects_from", all_ok);
-	}
-
-	{
-		// 方向利き
-
-		bool all_ok = true;
-		Bitboard occ(SQ_77);
-		Bitboard zero(ZERO);
-		all_ok &= rayEffect<Effect8::DIRECT_LD>(SQ_55, occ) == between_bb(SQ_55, SQ_88);
-		all_ok &= rayEffect<Effect8::DIRECT_LD>(SQ_55, zero) == QUGIY_STEP_EFFECT[Effect8::DIRECT_LD - 2][SQ_55];
-
-		Bitboard occ2(SQ_33);
-		all_ok &= rayEffect<Effect8::DIRECT_RU>(SQ_55, occ2) == between_bb(SQ_55, SQ_22);
-
-		tester.test("rayEffect", all_ok);
-	}
-
-	{
-		// SSE unpack
-
-		const Bitboard bb_0000(0, 0);
-		const Bitboard bb_ff00((u64)0, (u64)-1LL); // Bitboard(low64,high64)と書くようになっている。
-		const Bitboard bb_00ff((u64)-1LL, (u64)0);
-		const Bitboard bb_ffff((u64)-1LL, (u64)-1LL);
-
-		bool all_ok = true;
-		Bitboard hi_out, lo_out;
-
-		Bitboard::unpack(bb_ffff, bb_0000, hi_out, lo_out);
-
-		all_ok &= hi_out == bb_ff00;
-		all_ok &= lo_out == bb_ff00;
-
-		Bitboard::unpack(bb_ff00, bb_ff00, hi_out, lo_out);
-
-		all_ok &= hi_out == bb_ffff;
-		all_ok &= lo_out == bb_0000;
-
-		Bitboard::unpack(bb_ff00, bb_00ff, hi_out, lo_out);
-
-		all_ok &= hi_out == bb_ff00;
-		all_ok &= lo_out == bb_00ff;
-
-		tester.test("unpack", all_ok );
-	}
-
-	{
-		// Bitboard::decrement() method
-
-		const Bitboard all_bb((u64)-1LL, (u64)-1LL);
-		const Bitboard all_bb_minus_one((u64)-2LL, (u64)-2LL);
-		const Bitboard zero_bb(0, 0);
-
-		bool all_ok = true;
-		Bitboard hi_out, lo_out;
-
-		// これなら桁借りは生じない。
-		Bitboard::decrement(zero_bb, all_bb, hi_out, lo_out);
-
-		all_ok &= hi_out == zero_bb;
-		all_ok &= lo_out == all_bb_minus_one;
-
-		// これは桁借りが生じる。
-		Bitboard::decrement(all_bb, zero_bb, hi_out, lo_out);
-
-		all_ok &= hi_out == all_bb_minus_one;
-		all_ok &= lo_out == all_bb;
-
-		tester.test("decrement(static function)", all_ok );
-	}
-	{
-		const Bitboard zero_bb(0, 0);
-		const Bitboard minus_one((u64)-1LL, (u64)-1LL);
-		const Bitboard one_bb(1, 0);
-		bool all_ok = true;
-
-		all_ok &= zero_bb.decrement() == minus_one;
-		all_ok &= one_bb.decrement()  == zero_bb;
-
-		tester.test("decrement(method)", all_ok);
-	}
-	{
-		// pawn_attacks_bbのテスト
-		tester.test("pawn_attacks_bb<BLACK>",pawn_attacks_bb<BLACK>(RANK7_BB) == RANK6_BB);
-		tester.test("pawn_attacks_bb<WHITE>",pawn_attacks_bb<WHITE>(RANK7_BB) == RANK8_BB);
-
-		tester.test("attacks_bb<B_KNIGHT>",attacks_bb<B_KNIGHT>(SQ_77) == (Bitboard(SQ_85) | Bitboard(SQ_65)));
-		tester.test("attacks_bb<W_KNIGHT>",attacks_bb<W_KNIGHT>(SQ_77) == (Bitboard(SQ_89) | Bitboard(SQ_69)));
-	}
-	{
-		bool all_ok = true;
-		Bitboard bb;
-
-		bb = Bitboard(SQ_22) | Bitboard(SQ_77);
-		all_ok &= least_significant_square_bb(bb) == Bitboard(SQ_22);
-		bb = Bitboard(SQ_99) | Bitboard(SQ_87);
-		all_ok &= least_significant_square_bb(bb) == Bitboard(SQ_87);
-
-		tester.test("least_significant_square_bb",all_ok);
-	}
-}
-
-// UnitTest
-void Bitboard256::UnitTest(Test::UnitTester& tester, IEngine& engine)
-{
-	auto section1 = tester.section("Bitboard256");
-	{
-		// 2つのBitboardを合体させて、分離させて一致するかのテスト
-
-		bool all_ok = true;
-
-		Bitboard b1, b2 , b3 ,b4;
-
-		for (auto sq : SQ)
-		{
-			b1 = Bitboard(sq);
-			b2 = Bitboard(SQ_99 - sq);
-
-			Bitboard256 b256(b1, b2);
-			b256.toBitboard(b3, b4);
-			all_ok &= b1 == b3 && b2 == b4;
-		}
-
-		tester.test("toBitboard", all_ok);
-	}
-	{
-		// ByteReverseがちゃんと機能しているかのテスト
-
-		Bitboard256 b(Bitboard(0x0123456789abcdef, 0x123456789abcdef0), Bitboard(0x23456789abcdef01, 0x3456789abcdef012));
-		Bitboard256 r = b.byte_reverse();
-
-		tester.test("byte_reverse",
-			r.p[0] == 0xf0debc9a78563412 && r.p[1] == 0xefcdab8967452301 &&
-			r.p[2] == 0x12f0debc9a785634 && r.p[3] == 0x01efcdab89674523
-		);
 	}
 }
 

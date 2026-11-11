@@ -14,7 +14,6 @@
 #include "eval/nnue/nnue_accumulator.h"
 
 #include "extra/key128.h"
-#include "extra/long_effect.h"
 #include "misc.h"
 
 namespace YaneuraOu {
@@ -196,13 +195,6 @@ struct StateInfo {
 	// 評価値の差分計算の管理用
 	Eval::DirtyPiece dirtyPiece;
 
-#if defined(KEEP_LAST_MOVE)
-	// 直前の指し手。デバッグ時などにおいてその局面までの手順を表示出来ると便利なことがあるのでそのための機能
-	Move lastMove;
-
-	// lastMoveで移動させた駒(先後の区別なし)
-	PieceType lastMovedPieceType;
-#endif
 
 };
 
@@ -264,19 +256,6 @@ struct PackedSfen {
 		return !(this->operator==(rhs));
 	}
 };
-
-// PSV形式(.psv)の1レコード。
-// PackedSfenに、手番側視点のscoreなどを付与した40 bytes固定長形式。
-struct PsvRecord {
-	PackedSfen sfen;
-	s16        score;
-	u16        move;
-	u16        gamePly;
-	s8         game_result;
-	u8         padding;
-};
-
-static_assert(sizeof(PsvRecord) == 40, "PsvRecord must be 40 bytes");
 
 // std::unordered_mapで使用できるようにhash関数を定義しておく。
 // std::unordered_map<PackedSfen,int,PackedSfenHash> packed_sfen_to_int;のようにtemplateの第3引数に指定する。
@@ -371,17 +350,7 @@ public:
 	Piece moved_piece_before(Move m) const
 	{
 		ASSERT_LV3(m.is_ok());
-#if defined( KEEP_PIECE_IN_GENERATE_MOVES)
-		// 上位16bitに格納されている値を利用する。
-		// return is_promote(m) ? (piece & ~PIECE_PROMOTE) : piece;
-		// みたいなコードにしたいので、
-		// mのMOVE_PROMOTEのbitで、PIECE_PROMOTEのbitを反転させてやる。
-		static_assert(MOVE_PROMOTE == (1 << 15) && PIECE_PROMOTE == 8, "");
-		return (Piece)((m ^ ((m & MOVE_PROMOTE) << 4)) >> 16);
-
-#else
 		return m.is_drop() ? make_piece(sideToMove , m.move_dropped_piece()) : piece_on(m.from_sq());
-#endif
 	}
 
 	// moved_pieceの拡張版。
@@ -573,19 +542,10 @@ public:
 
     // attackers_to()で駒があればtrueを返す版。(利きの情報を持っているなら、軽い実装に変更できる)
     // kingSqの地点からは玉を取り除いての利きの判定を行なう。
-#if !defined(LONG_EFFECT_LIBRARY)
     bool effected_to(Color c, Square sq) const { return attackers_to(c, sq, pieces()); }
     bool effected_to(Color c, Square sq, Square kingSq) const {
         return attackers_to(c, sq, pieces() ^ kingSq);
     }
-#else
-    bool effected_to(Color c, Square sq) const { return board_effect[c].effect(sq) != 0; }
-    bool effected_to(Color c, Square sq, Square kingSq) const {
-        return board_effect[c].effect(sq) != 0
-            || ((long_effect.directions_of(c, kingSq) & Effect8::directions_of(kingSq, sq))
-                != 0);  // 影の利きがある
-    }
-#endif
 
 #endif
 
@@ -975,41 +935,12 @@ public:
 	static std::string sfen_from_rawdata(Piece board[81], Hand hands[2], Color turn, int gamePly);
 
 	// -- 利き
-#if defined(LONG_EFFECT_LIBRARY)
-
-	// 各升の利きの数
-	LongEffect::ByteBoard board_effect[COLOR_NB];
-
-	// NNUE halfKPE9で局面の差分計算をするときに用いる
-#if defined(USE_BOARD_EFFECT_PREV)
-	// 前局面のboard_effect（評価値の差分計算用）
-
-	// 構造的には、StateInfoが持つべきなのだが、探索のほうで
-	// do_move()して次のnodeのsearch()が呼び出された直後にしかevaluate()は
-	// 呼び出さないので、do_move()でこの利きをboard_effectからコピーすれば
-	// KPE9の差分計算で困ることはない。
-	LongEffect::ByteBoard board_effect_prev[COLOR_NB];
-#endif
-
-	// 長い利き(これは先後共用)
-	LongEffect::WordBoard long_effect;
-
-#endif
 
 	// --- デバッグ用の出力
 
-#if defined(KEEP_LAST_MOVE)
-  // 開始局面からこの局面にいたるまでの指し手を表示する。
-	std::string moves_from_start() const { return moves_from_start(false); }
-	std::string moves_from_start_pretty() const { return moves_from_start(true); }
-	std::string moves_from_start(bool is_pretty) const;
-#endif
 
 	// 盤面を出力する。(USI形式ではない) デバッグ用。
 	friend std::ostream& operator<<(std::ostream& os, const Position& pos);
-
-	// UnitTest
-	static void UnitTest(Test::UnitTester& tester, IEngine& engine);
 
 private:
     // Initialization helpers (used while setting up a position)

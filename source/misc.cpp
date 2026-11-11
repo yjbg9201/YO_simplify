@@ -62,7 +62,6 @@ using fun8_t = bool(*)(HANDLE, BOOL, PTOKEN_PRIVILEGES, DWORD, PTOKEN_PRIVILEGES
 #include <filesystem>           // create_directory()
 #include "usi.h"				// Options
 #include "thread.h"             // ThreadPool
-#include "testcmd/unit_test.h"	// UnitTester
 
 using namespace std;
 
@@ -412,90 +411,6 @@ string compiler_info() {
 	compiler += "\n";
 
 	return compiler;
-}
-
-// config.hで設定した値などについて出力する。
-string config_info()
-{
-	string config = "\nconfigured by config.h";
-
-	auto o  = [](string(p) , string(q)) { return "\n" + (p + string(20,' ')).substr(0,20) + " : " + q; };
-	auto o1 = [&o](const char* p , u64  u ) { return o(string(p) , std::to_string(u) ); };
-	auto o2 = [&o](const char* p , bool b ) { return o(string(p) , b ? "true":"false"); };
-
-	// 評価関数タイプ
-	string eval_type =
-
-	// NNUE
-	#if defined(NNUE_ARCHITECTURE_HEADER)
-		NNUE_ARCHITECTURE_HEADER;
-	#elif defined(EVAL_NNUE_HALFKP256)
-		"halfkp_256x2_32_32";
-	#elif defined(EVAL_NNUE_KP256)
-		"kp_256x2_32_32";
-	#elif defined(EVAL_NNUE_HALFKPE9)
-		"halfkpe9_256x2_32_32";
-	#elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_512X2_16_32)
-		"halfkp_512x2_16_32";
-	#elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_32)
-		"halfkp_1024x2_8_32";
-	#elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_64)
-		"halfkp_1024x2_8_64";
-	#elif defined(YANEURAOU_ENGINE_SFNN1536)
-		"sfnn-1536";
-	#elif defined(EVAL_NNUE_HALFKP_VM_256X2_32_32)
-		"halfkpvm_256x2_32_32";
-	#else
-		"halfkp_256x2_32_32";
-	#endif
-
-
-	config += o ("EVAL"                , eval_type);
-
-	config += o1("ASSERT_LV"           , ASSERT_LV      );
-	config += o1("HASH_KEY_BITS"       , HASH_KEY_BITS  );
-	config += o1("TT_CLUSTER_SIZE"     , TT_CLUSTER_SIZE);
-
-	bool for_tournament = 
-#if defined(FOR_TOURNAMENT)
-		true;
-#else
-		false;
-#endif
-
-	bool test_cmd =
-#if defined(ENABLE_TEST_CMD)
-		true;
-#else
-		false;
-#endif
-
-	bool make_book_cmd = 
-#if defined(ENABLE_MAKEBOOK_CMD)
-		true;
-#else
-		false;
-#endif
-
-	bool use_mate_dfpn =
-#if defined(USE_MATE_DFPN)
-		true;
-#else
-		false;
-#endif
-
-	config += o2("PRETTY_JP"                , pretty_jp          );
-	config += o2("FOR_TOURNAMENT"           , for_tournament     );
-	config += o2("ENABLE_TEST_CMD"          , test_cmd           );
-	config += o2("ENABLE_MAKEBOOK_CMD"      , make_book_cmd      );
-	config += o2("USE_MATE_DFPN"            , use_mate_dfpn      );
-
-	// コンパイラ情報もついでに出力する。
-	//config += "\n\n" + compiler_info();
-
-	// その他、欲しいものがあれば追加するかも。
-
-	return config;
 }
 
 // --------------------
@@ -2081,46 +1996,5 @@ void StandardInput::parse_args(const CommandLine& cli)
 			cmds.push(cmd);
 	}
 }
-
-// --------------------
-//     UnitTest
-// --------------------
-
-namespace Misc {
-	// このheaderに書いてある関数のUnitTest。
-	void UnitTest(Test::UnitTester& tester, IEngine& engine)
-	{
-		auto section1 = tester.section("Misc");
-
-		{
-			auto section2 = tester.section("Path");
-
-			{
-				auto section3 = tester.section("Combine");
-
-				tester.test("Absolute Path Root1",        Path::Combine("xxxx"  , "/dir"   ) == "/dir"     );
-				tester.test("Absolute Path Root2",        Path::Combine("xxxx"  , "\\dir"  ) == "\\dir"    );
-				tester.test("Absolute Path Home",         Path::Combine("xxxx"  , "~dir"   ) == "~dir"     );
-				tester.test("Absolute Path Drive Letter", Path::Combine("xxxx"  , "c:\\dir") == "c:\\dir"  );
-				tester.test("Absolute Path UNC",          Path::Combine("xxxx"  , "\\\\dir") == "\\\\dir"  );
-				tester.test("Relative Path1",             Path::Combine("xxxx"  , "yyy"    ) == "xxxx/yyy" );
-				tester.test("Relative Path2",             Path::Combine("xxxx/" , "yyy"    ) == "xxxx/yyy" );
-				tester.test("Relative Path3",             Path::Combine("xxxx\\", "yyy"    ) == "xxxx\\yyy");
-			}
-
-		}
-		{
-			auto section2 = tester.section("StringExtension");
-			{
-				tester.test("to_string_with_zero", StringExtension::to_string_with_zero(123 , 6) == "000123");
-				tester.test("to_string_with_zero", StringExtension::to_string_with_zero(1234, 6) == "001234");
-				tester.test("ToUpper"            , StringExtension::ToUpper("False&True") == "FALSE&TRUE");
-
-				auto v = StringExtension::Split("ABC ; DEF ; GHI", " ; ");
-				tester.test("Split"              , v[0]=="ABC" && v[1]=="DEF" && v[2] =="GHI");
-			}
-		}
-	}
-} // namespace Misc
 
 } // namespace YaneuraOu

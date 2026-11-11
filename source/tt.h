@@ -186,8 +186,6 @@ public:
 	TTEntry* first_entry(const Key& key, Color side_to_move) const;
 #endif
 
-	static void UnitTest(Test::UnitTester& unittest, IEngine& engine);
-
 private:
 	friend struct TTEntry;
 

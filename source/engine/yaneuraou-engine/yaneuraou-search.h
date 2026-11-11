@@ -381,13 +381,6 @@ class YaneuraOuEngine: public Engine {
 	// 置換表の使用率を返す。
     virtual int get_hashfull(int maxAge) const override;
 
-    // USI拡張コマンド "qsearch_psv" の実体。
-    // .psv(PsvRecord列)の各局面をqsearch PVのleaf nodeで置換して書き出す。
-    virtual bool qsearch_psv(const std::string& inputPath,
-                             const std::string& outputPath,
-                             size_t             workerCount,
-                             std::string&       message) override;
-
 	// 現在の局面の評価値の詳細を出力する。
     virtual void trace_eval() const override;
 

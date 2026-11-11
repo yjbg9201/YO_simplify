@@ -970,14 +970,6 @@ Value evaluate(const Position& pos) {
         return accumulator.score;
     }
 
-#if defined(USE_GLOBAL_OPTIONS)
-    // GlobalOptionsでeval hashを用いない設定になっているなら
-    // eval hashへの照会をskipする。
-    if (!GlobalOptions.use_eval_hash) {
-        ASSERT_LV5(pos.state()->materialValue == Eval::material(pos));
-        return NNUE::ComputeScore(pos);
-    }
-#endif
 
 #if defined(USE_EVAL_HASH)
     // evaluate hash tableにはあるかも。

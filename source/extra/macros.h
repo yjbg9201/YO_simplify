@@ -63,11 +63,6 @@ ENABLE_FULL_OPERATORS_ON(Effect8::Direct)
   constexpr T& operator^=(T& d1, const T d2) { return d1 = T(int(d1) ^ int(d2)); }		\
   constexpr T  operator~(const T d1) { return T(~int(d1)); }
 
-#if defined(LONG_EFFECT_LIBRARY)
-// LONG_EFFECT_LIBRARYでHandKind使ってる箇所がある。そのうち修正する。
-ENABLE_FULL_OPERATORS_ON(HandKind)
-ENABLE_BIT_OPERATORS_ON(HandKind)
-#endif
 
 
 // enumに対してrange forで回せるようにするためのhack(やねうら王独自拡張)

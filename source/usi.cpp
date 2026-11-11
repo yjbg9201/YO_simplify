@@ -8,7 +8,6 @@
 #include "search.h"
 #include "thread.h"
 #include "misc.h"
-#include "testcmd/unit_test.h"
 #include "benchmark.h"
 #include "engine.h"
 #include "movegen.h"
@@ -32,11 +31,6 @@ void test_cmd(IEngine& engine, std::istringstream& is);
 }
 
 // 定跡を作るコマンド
-#if defined(ENABLE_MAKEBOOK_CMD)
-namespace Book {
-void makebook(IEngine& engine, std::istringstream& is);
-}
-#endif
 
 #endif
 
@@ -351,25 +345,6 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
     else if (token == "compiler")
         sync_cout << compiler_info() << sync_endl;
 
-    // 評価関数パラメーターをファイルに保存する。
-    // export_net filename
-    else if (token == "export_net")
-    {
-#if STOCKFISH
-        std::pair<std::optional<std::string>, std::string> files[2];
-
-        if (is >> std::skipws >> files[0].second)
-            files[0].first = files[0].second;
-
-        if (is >> std::skipws >> files[1].second)
-            files[1].first = files[1].second;
-#else
-    std::string file;
-    is >> std::skipws >> file;
-    engine.save_network(file);
-#endif
-    }
-
 #if STOCKFISH
     else if (token == "--help" || token == "help" || token == "--license" || token == "license")
         sync_cout << "\nStockfish is a powerful chess engine for playing and analyzing."
@@ -404,50 +379,11 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
     else if (token == "getoption")
         getoption(is);
 
-    // UnitTest
-    else if (token == "unittest")
-        unittest(is);
-
-    // config.hで設定した値などについて出力する。
-    else if (token == "config")
-        sync_cout << config_info() << sync_endl;
-
-    // .psv(PsvRecord列)の局面をqsearch PVのleafに置換する。
-    else if (token == "qsearch_psv")
-        qsearch_psv(is);
-
-#if defined(ENABLE_MAKEBOOK_CMD)
-	// 定跡コマンド
-	else if (token == "makebook")
-        Book::makebook(engine, is);
-#endif
-
-    // 指し手生成祭りの局面をセットする。
-    else if (token == "matsuri")
-    {
-        std::istringstream iss("l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1");
-
-		// "position"コマンドが実行されたものとして処理する。
-        position(iss);
-
-        sync_cout << "The matsuri position has been set." << sync_endl;
-    }
-
     // ログファイルの書き出しのon
     // 🤔 Stockfishの方は、エンジンオプションでログの出力ファイル名を指定できるのだが、
     //     ログ自体はホスト側で記録することが多いので、ファイル名は固定でいいや…。
     else if (token == "log")
         start_logger("io_log.txt");
-
-#if defined(ENABLE_TEST_CMD)
-    // テストコマンド
-    else if (token == "test")
-        Test::test_cmd(engine, is);
-#endif
-
-    // ユーザーによる実験用コマンド。Engine::user_cmd()が呼び出される。
-    else if (token == "user")
-        engine.user(is);
 
 
     // エンジンオプションの簡易変更機能
@@ -1407,30 +1343,6 @@ void USIEngine::getoption(std::istringstream& is) {
     sync_cout << options.get_option(option_name) << sync_endl;
 }
 
-// USI拡張コマンド "qsearch_psv" のhandler。
-// input.psvの各PsvRecord局面をqsearchのPV leaf nodeで置換し、
-// output.psvへ同じPSV形式で書き出す処理をEngine側へ委譲する。
-void USIEngine::qsearch_psv(std::istringstream& is) {
-    std::string inputPath, outputPath;
-    size_t      workerCount = 0;
-
-    is >> inputPath >> outputPath;
-    if (!(is >> workerCount))
-        workerCount = 0;
-
-    std::string message;
-    const bool  ok = engine.qsearch_psv(inputPath, outputPath, workerCount, message);
-
-    if (!message.empty())
-        sync_cout << "info string " << message << sync_endl;
-
-    if (!ok)
-        sync_cout << "info string qsearch_psv failed" << sync_endl;
-}
-
-// "unittest"コマンドのhandler
-void USIEngine::unittest(std::istringstream& is) { Test::UnitTest(is, engine); }
-
 
 // コマンドラインに書かれているUSIコマンドをstd_inputに積む。
 void USIEngine::enqueue_command_line_commands(const CommandLine& cli) {
@@ -1477,83 +1389,8 @@ void USIEngine::enqueue_command_from_file(std::istringstream& is) {
 //      USI拡張コマンド "test"
 // ----------------------------------
 
-#if defined(ENABLE_TEST_CMD)
-
-// USI拡張コマンドのうち、開発上のテスト関係のコマンド。
-// 思考エンジンの実行には関係しない。
-
-namespace Test {
-// 通常のテスト用コマンド。コマンドを処理した時 trueが返る。
-bool normal_test_cmd(IEngine& engine, std::istringstream& is, const std::string& token);
-
-// 詰み関係のテスト用コマンド。コマンドを処理した時 trueが返る。
-bool mate_test_cmd(IEngine& engine, std::istringstream& is, const std::string& token);
-
-void test_cmd(IEngine& engine, std::istringstream& is) {
-    std::string token;
-    is >> token;
-
-    // デザパタのDecoratorの呼び出しみたいな感じで書いていく。
-
-    // 通常のテスト用コマンド
-    if (normal_test_cmd(engine, is, token))
-        return;
-
-    // 詰み関係のテスト用コマンド
-    if (mate_test_cmd(engine, is, token))
-        return;
-
-    sync_cout << "info string Error! : unknown command = " << token << sync_endl;
-}
-}
-
-#endif  // defined(ENABLE_TEST_CMD)
 
 
-
-// namespace USI内のUnitTest。
-void USIEngine::UnitTest(Test::UnitTester& tester, IEngine& engine) {
-    auto section1 = tester.section("USI");
-
-    Position  pos;
-    StateInfo si;
-
-    // 平手初期化
-    auto hirate_init = [&] { pos.set_hirate(&si); };
-
-    // SFEN文字列でのPosition初期化
-    auto sfen_init = [&](const std::string& sfen) { pos.set(sfen, &si); };
-
-    {
-        auto section2 = tester.section("to_move()");
-        {
-            //auto section3 = tester.section("unpromoted pawn move");
-
-            sfen_init("2sgkgs2/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1");
-
-            auto moves =
-              "6a5b 1g1f 4a3b 1f1e 3a2b 2g2f 2c2d 7g7f 3b2c 2f2e 2d2e 2h2e P*2d 2e9e 7a8b 8h6f 8c8d 3i3h 5b6b 7i6h 6b7b 9e9f 7b8c 6h7g 7c7d 7f7e 7d7e 7g8f 8b7c 1e1d 1c1d 8f7e P*7d 7e8f 5a5b P*7b 5b6b 7b7a+ 6b7a P*7e 7a6b 7e7d 7c7d 8f9e P*7e 9f8f 8d8e 8f9f 5c5d 5g5f 6c6d 5f5e 6b6c 5e5d 6c5d 8i7g 6d6e 6f5g 2c3d 6i7h 3d4e 4g4f P*5f 5g6h 4e5e 3h4g 6e6f 4f4e 9c9d 9e9d 8c8d 6g6f P*9e 9d9c 8d9d P*5g 9e9f P*2c 2b2c 5g5f 5e4e P*4f 4e4d 4f4e 4d4e 9c8b 7e7f 7g6e 7d7e P*4f 4e4d 4f4e 4d4e 7h6g R*8i 5i4h 8i9i+ P*4f 4e4d 4f4e 4d4e 6e7c+ 4c4d 7c7d 9d8d 7d8d 7e8d 4g4f 4e4f 6h4f L*4e 6g5g 4e4f 5g4f 5d4c 5f5e P*5c G*2b 2c3d L*5i 4d4e 4f3f 4e4f 3f4f P*4e 4f3f 4e4f 3f4f P*4e 4f3f 4e4f 3f4f P*4e 4f3f 4e4f 3f4f P*4e 4f3f 4e4f 3f4f P*4e 4f3f N*4d 4h3h 4d3f 3g3f 4e4f P*2g S*4g 3h2h 4g3f P*4d 4c4d P*4h 2d2e P*3g 3f2g 2h2g 2e2f 2g2f 3d3e 2f2e G*2d 2e1f 1d1e 1f1g P*2f N*3f 3e3f 3g3f B*2g S*3h 2g3f+ 1g2h N*3e S*1h 2f2g+ 1h2g 3e2g+ 3h2g 3f6c N*3f 4d3d 3f2d P*2f 2g2f S*2g 2h3i P*2h G*3g 2h2i+ 3i2i P*2h 2i3i N*5g 3g4f 5g4i+ 3i4i G*6h P*7i 9i7i G*5h 6h5h 4i5h 7i7h G*6h G*6g 5h4g 7h6h N*3f G*5g 4g3g 6h4h 3g2g 4h4f P*3g 3d4e S*3e 4f4g P*4i 4e5f 4i4h 4g4h 5i5g 5f5g 1i1e 5g5h 2g1f 5h5i P*4f 4h4i 1e1c+ 4i5h 1f1e 5h4g G*3i 4g5h 8b7a+ 6c6d 1e1d 6d5e 8g8f 8e8f P*8g 8f8g";
-            // ↑この局面、最後の8f8gが歩の不成だが、これがUSI::to_move()で非合法手扱いされないかをテストする。
-            // cf. https://github.com/yaneurao/YaneuraOu/issues/190
-
-            std::istringstream is(moves);
-            std::string        token;
-            bool          fail = false;
-
-            StateInfo si[512];
-            while (is >> token)
-            {
-                Move m = USIEngine::to_move(pos, token);
-                if (m == Move::none())
-                    fail = true;
-
-                pos.do_move(m, si[pos.game_ply()]);
-            }
-
-            tester.test("pawn's unpromoted move", !fail);
-        }
-    }
-}
 
 
 // TODO : 🚧 工事中 🚧
@@ -1565,14 +1402,7 @@ void USIEngine::UnitTest(Test::UnitTester& tester, IEngine& engine) {
 // "user"コマンドの後続に指定されている文字列はisのほうに渡される。
 void user_test(Position& pos, std::istringstream& is);
 
-#if defined(ENABLE_TEST_CMD)
-	void generate_moves_cmd(Position& pos);
-#endif
 
-#if defined(USE_MATE_DFPN)
-// "mate"コマンド
-void mate_cmd(Position& pos, std::istream& is);
-#endif
 
 
 // "gameover"コマンドに対するハンドラ

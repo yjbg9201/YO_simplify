@@ -82,8 +82,6 @@ public:
 		verify_networks()
 			評価関数部の初期化が行えているかのチェックを行う。
 
-		save_network()
-			評価関数パラメーターを保存する。
 
 	*/
 
@@ -210,15 +208,6 @@ public:
     void load_big_network(const std::string& file);
     void load_small_network(const std::string& file);
 #endif
-    // 評価関数パラメーターを保存する。
-    // "export_net"コマンドに対して呼び出される。
-#if STOCKFISH
-    void         save_network(const std::pair<std::optional<std::string>, std::string> files[2]);
-#else
-    // 評価関数をファイルに保存する。
-    virtual void save_network(const std::string& path) = 0;
-#endif
-
     // utility functions
 	// ユーティリティ関数
 
@@ -257,18 +246,6 @@ public:
     virtual std::string thread_allocation_information_as_string() const { return ""; }
     virtual std::string thread_binding_information_as_string() const { return ""; }
 
-#if !STOCKFISH
-    // USI拡張コマンド "qsearch_psv" 用のhook。
-    // inputPathの.psv(PsvRecord列)を読み、各局面をqsearch PVのleaf nodeで置換して
-    // outputPathへ書き出す。対応していないEngine派生classではfalseを返す。
-    virtual bool qsearch_psv(const std::string& inputPath,
-                             const std::string& outputPath,
-                             size_t             workerCount,
-                             std::string&       message) {
-        message = "qsearch_psv is not supported by this engine.";
-        return false;
-    }
-#endif
 
 #if STOCKFISH
    private:
@@ -333,9 +310,6 @@ public:
 	// 1局ごとに行いたい探索部の初期化は、ここで行うこと。
 	virtual void usinewgame() = 0;
 
-	// "user"コマンド。ユーザー(エンジン実装者)の実験用。
-	virtual void user(std::istringstream& is) = 0;
-
 	// 📌 "usi"コマンドに対して表示するengineのprofile
 
 	virtual std::string get_engine_name() const    = 0;
@@ -378,7 +352,6 @@ class Engine: public IEngine {
     get_on_bestmove() override final;
 
     virtual void verify_networks() const override {}
-    virtual void save_network(const std::string& path) override {}
 
     virtual void              trace_eval() const override;
     virtual Value             evaluate() const override;
@@ -396,17 +369,6 @@ class Engine: public IEngine {
     virtual std::string thread_allocation_information_as_string() const override;
     virtual std::string thread_binding_information_as_string() const override;
 
-#if !STOCKFISH
-    // USI拡張コマンド "qsearch_psv" 用のhook。
-    // 標準Engine基底classは未対応扱いとし、標準探索部(YaneuraOuEngine)でoverrideする。
-    virtual bool qsearch_psv(const std::string& inputPath,
-                             const std::string& outputPath,
-                             size_t             workerCount,
-                             std::string&       message) override {
-        message = "qsearch_psv is not supported by this engine.";
-        return false;
-    }
-#endif
 
     virtual void              add_options() override;
     virtual ThreadPool&       get_threads() override { return threads; }
@@ -416,7 +378,6 @@ class Engine: public IEngine {
     virtual void usi() override;
     virtual void isready() override;
     virtual void usinewgame() override {};
-    virtual void user(std::istringstream& is) override {};
 
     virtual std::string get_engine_name() const override { return "YaneuraOu"; }
     virtual std::string get_engine_author() const override { return "yaneurao"; }
@@ -553,7 +514,6 @@ class EngineWrapper: public IEngine {
     }
 
     virtual void verify_networks() const override { engine->verify_networks(); }
-    virtual void save_network(const std::string& path) override { engine->save_network(path); }
 
     virtual void trace_eval() const override { engine->trace_eval(); }
     virtual Value evaluate() const override { return engine->evaluate(); }
@@ -584,14 +544,6 @@ class EngineWrapper: public IEngine {
         return engine->thread_binding_information_as_string();
     }
 
-#if !STOCKFISH
-    virtual bool qsearch_psv(const std::string& inputPath,
-                             const std::string& outputPath,
-                             size_t             workerCount,
-                             std::string&       message) override {
-        return engine->qsearch_psv(inputPath, outputPath, workerCount, message);
-    }
-#endif
 
     virtual void              add_options() override { return engine->add_options(); }
     virtual ThreadPool&       get_threads() override { return engine->get_threads(); }
@@ -601,7 +553,6 @@ class EngineWrapper: public IEngine {
     virtual void usi() override { engine->usi(); }
     virtual void isready() override { engine->isready(); }
     virtual void usinewgame() override { engine->usinewgame(); }
-    virtual void user(std::istringstream& is) override { engine->user(is); }
 
     virtual std::string get_engine_name() const override { return engine->get_engine_name(); }
     virtual std::string get_engine_author() const override { return engine->get_engine_author(); }

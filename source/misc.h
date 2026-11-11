@@ -54,9 +54,6 @@ std::string engine_info(const std::string& engine_name,
 // 使用したコンパイラについての文字列を返す。
 std::string compiler_info();
 
-// config.hで設定した値などについて出力する。
-std::string config_info();
-
 
 // --------------------
 //    prefetch命令
@@ -1466,15 +1463,6 @@ private:
 	// これが尽きれば標準入力から入力する。
 	std::queue<std::string> cmds;
 };
-
-// --------------------
-//     UnitTest
-// --------------------
-
-namespace Misc {
-	// このheaderに書いてある関数のUnitTest。
-	void UnitTest(Test::UnitTester& tester, IEngine& engine);
-}
 
 } // namespace YaneuraOu
 

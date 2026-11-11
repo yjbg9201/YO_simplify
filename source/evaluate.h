@@ -174,19 +174,7 @@ namespace Eval {
 		// === 以下、拡張領域 ===
 
 		// 金と小駒の成り駒を区別する
-#if defined(DISTINGUISH_GOLDS)
-		f_pro_pawn = fe_old_end,
-		e_pro_pawn = f_pro_pawn + 81,
-		f_pro_lance = e_pro_pawn + 81,
-		e_pro_lance = f_pro_lance + 81,
-		f_pro_knight = e_pro_lance + 81,
-		e_pro_knight = f_pro_knight + 81,
-		f_pro_silver = e_pro_knight + 81,
-		e_pro_silver = f_pro_silver + 81,
-		fe_new_end = e_pro_silver + 81,
-#else
 		fe_new_end = fe_old_end,
-#endif
 
 		fe_end = fe_new_end,
 

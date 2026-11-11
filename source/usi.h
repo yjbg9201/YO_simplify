@@ -10,7 +10,6 @@
 #include "types.h"
 #include "engine.h"
 #include "position.h"
-#include "testcmd/unit_test.h"
 
 namespace YaneuraOu {
 
@@ -149,8 +148,6 @@ public:
     // 単一エンジン起動用に、コマンドラインとstartup.txtのUSIコマンドをstd_inputに積む。
     void enqueue_startup_commands(const CommandLine& cli);
 
-	// このclassのUnitTest。
-	static void UnitTest(Test::UnitTester& tester, IEngine& engine);
 #endif
 
 private:
@@ -190,8 +187,6 @@ private:
 	void isready();
     void moves();
     void getoption(std::istringstream& is);
-    void qsearch_psv(std::istringstream& is);
-    void unittest(std::istringstream& is);
 #endif
 
 	// 読み筋を出力するevent handler

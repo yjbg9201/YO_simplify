@@ -241,22 +241,6 @@ class FeatureTransformer {
 		}
 	}
 
-#if defined(ENABLE_TEST_CMD)
-	// Independent reference for checking both incremental updates and Finny.
-	// Deliberately bypass all cached accumulators.
-	void RefreshAccumulatorForTest(const Position& pos) const {
-		auto& accumulator = pos.state()->accumulator;
-		for (IndexType i = 0; i < kRefreshTriggers.size(); ++i) {
-			Features::IndexList active_indices[2];
-			RawFeatures::AppendActiveIndices(pos, kRefreshTriggers[i], active_indices);
-			for (const auto perspective : COLOR)
-				refresh_accumulator_from_scratch(
-					accumulator.accumulation[perspective][i], active_indices[perspective], i);
-		}
-		accumulator.computed_accumulation = true;
-		accumulator.computed_score = false;
-	}
-#endif
 
 	// Convert input features
 	// 入力特徴量を変換する

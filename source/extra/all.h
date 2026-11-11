@@ -17,7 +17,6 @@
 #include "../misc.h"
 #include "../tt.h"
 #include "../usi.h"
-#include "long_effect.h"
 #include "../book/book.h"
 #include "../mate/mate.h"
 #include "../evaluate.h"

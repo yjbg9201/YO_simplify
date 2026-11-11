@@ -9,7 +9,6 @@
 #include "mate/mate.h"
 #include "book/book.h"
 #include "movegen.h"
-#include "testcmd/unit_test.h"
 
 #include "eval/evaluate_common.h"
 
@@ -700,10 +699,6 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
 
     // --- long effect
 
-#if defined(LONG_EFFECT_LIBRARY)
-    // 利きの全計算による更新
-    LongEffect::calc_effect(*this);
-#endif
 
     // --- evaluate
 
@@ -1151,32 +1146,6 @@ std::ostream& operator<<(std::ostream& os, const Position& pos)
 	return os;
 }
 
-#if defined (KEEP_LAST_MOVE)
-
-// 開始局面からこの局面にいたるまでの指し手を表示する。
-std::string Position::moves_from_start(bool is_pretty) const
-{
-	StateInfo* p = st;
-	std::stack<StateInfo*> states;
-	while (p->previous != nullptr)
-	{
-		states.push(p);
-		p = p->previous;
-	}
-
-	stringstream ss;
-	while (states.size())
-	{
-		auto& top = states.top();
-		if (is_pretty)
-			ss << pretty(top->lastMove, top->lastMovedPieceType) << ' ';
-		else
-			ss << top->lastMove << ' ';
-		states.pop();
-	}
-	return ss.str();
-}
-#endif
 
 
 
@@ -1295,7 +1264,6 @@ bool Position::legal_drop(const Square to) const
 	// 相手玉の場所
 	Square sq_king = square<KING>(~us);
 
-#if !defined(LONG_EFFECT_LIBRARY)
 	// LONG EFFECT LIBRARYがない場合、愚直に8方向のうち逃げられそうな場所を探すしかない。
 
 	Bitboard escape_bb = kingEffect(sq_king) & ~pieces(~us);
@@ -1310,28 +1278,6 @@ bool Position::legal_drop(const Square to) const
 
 	// すべての検査を抜けてきたのでこれは打ち歩詰めの条件を満たしている。
 	return false;
-#else
-	// LONG EFFECT LIBRARYがあれば、玉の8近傍の利きなどを直列化して逃げ場所があるか調べるだけで良いはず。
-
-	auto a8_effet_us = board_effect[us].around8(sq_king);
-	// 玉の逃げ場所は、本来はEffect8::around8(escape_bb,sq_king)なのだが、どうせaround8が8近傍だけを直列化するので、
-	// これが玉の利きと一致しているからこのkingEffect(sq_king)でマスクする必要がない。
-	auto a8_them_movable = Effect8::around8(~pieces(~us), sq_king) & Effect8::board_mask(sq_king);
-
-	// 打った歩での遮断を考える前の段階ですでにすでに歩を打つ側の利きがない升があり、
-	// そこに移動できるのであれば、これは打ち歩ではない。
-	if (~a8_effet_us & a8_them_movable)
-		return true;
-
-	// 困ったことに行けそうな升がなかったので打った歩による利きの遮断を考える。
-	// いまから打つ歩による遮断される升の利きが2以上でなければそこに逃げられるはず。
-	auto a8_long_effect_to = long_effect.directions_of(us, to);
-	auto to_dir = (us == BLACK) ? DIRECT_D : DIRECT_U;  // 王から見た歩の方角
-	auto a8_cutoff_dir = Effect8::cutoff_directions(to_dir, a8_long_effect_to);
-	auto a8_target = a8_cutoff_dir & a8_them_movable & ~board_effect[us].around8_greater_than_one(sq_king);
-
-	return a8_target != 0;
-#endif
 }
 
 // 二歩でなく、かつ打ち歩詰めでないならtrueを返す。
@@ -1705,18 +1651,9 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
     st->accumulator.computed_accumulation = false;
     st->accumulator.computed_score        = false;
 
-#if defined(USE_BOARD_EFFECT_PREV)
-    // NNUE-HalfKPE9
-    // 現局面のboard_effectをコピー
-    std::memcpy(board_effect_prev, board_effect, sizeof(board_effect));
-#endif
 
     // 直前の指し手を保存するならばここで行なう。
 
-#if defined(KEEP_LAST_MOVE)
-    st->lastMove           = m;
-    st->lastMovedPieceType = m.is_drop() ? PieceType(m.from_sq()) : type_of(piece_on(m.from_sq()));
-#endif
 
 
     // ----------------------
@@ -1846,10 +1783,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
         // 駒打ちなので駒割りの変動なし。
         materialDiff = 0;
 
-#if defined(LONG_EFFECT_LIBRARY)
-        // 駒打ちによる利きの更新処理
-        LongEffect::update_by_dropping_piece<Us>(*this, to, pc);
-#endif
     }
     else
     {
@@ -1877,11 +1810,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 			// 取られた駒のあったマス        	
             Square capsq = to;
 
-#if defined(LONG_EFFECT_LIBRARY)
-            // 移動先で駒を捕獲するときの利きの更新
-            LongEffect::update_by_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc,
-                                                      captured);
-#endif
 
 			PieceType pr = raw_type_of(captured);
 
@@ -1928,10 +1856,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
             st->capturedPiece = NO_PIECE;
 
-#if defined(LONG_EFFECT_LIBRARY)
-            // 移動先で駒を捕獲しないときの利きの更新
-            LongEffect::update_by_no_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc);
-#endif
             dp.dirty_num = 1;  // 動いた駒は1個
         }
 
@@ -2247,10 +2171,6 @@ void Position::undo_move_impl(Move m) {
         // toの場所から駒を消す
         remove_piece(to);
 
-#if defined(LONG_EFFECT_LIBRARY)
-        // 駒打ちのundoによる利きの復元
-        LongEffect::rewind_by_dropping_piece<Us>(*this, to, moved_after_pc);
-#endif
     }
     else
     {
@@ -2288,11 +2208,6 @@ void Position::undo_move_impl(Move m) {
             // rewind_by_capturing_piece()でその位置を用いているのでまずい。(かも)
             evalList.put_piece(piece_no, from, moved_pc);
 
-#if defined(LONG_EFFECT_LIBRARY)
-            // 移動先で駒を捕獲するときの利きの更新
-            LongEffect::rewind_by_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc,
-                                                      to_pc);
-#endif
         }
         else
         {
@@ -2302,11 +2217,6 @@ void Position::undo_move_impl(Move m) {
             // 成りの指し手だったなら非成りの駒がfromの場所に戻る。さもなくばそのまま戻る。
             evalList.put_piece(piece_no, from, moved_pc);
 
-#if defined(LONG_EFFECT_LIBRARY)
-            // 移動先で駒を捕獲しないときの利きの更新
-            // このときに元あった玉の位置を用いるのでkingSquareはまだ更新してはならない。
-            LongEffect::rewind_by_no_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc);
-#endif
         }
 
         if (type_of(moved_pc) == KING)
@@ -3235,681 +3145,6 @@ bool Position::pos_is_ok() const
 
 	return true;
 }
-
-// ----------------------------------
-//			UnitTest
-// ----------------------------------
-
-namespace {
-	// performance test
-	// ある局面から、全合法手を生成して depth深さまで辿り、局面数がいくらあったかを返す。
-	u64 perft(Position& pos, Depth depth)
-	{
-		StateInfo st;
-		u64 cnt, nodes = 0;
-
-		auto ml = MoveList<LEGAL_ALL>(pos);
-		if (depth == 1)
-			return ml.size();
-
-		const bool leaf = (depth == 2);
-		for (const auto& m : ml)
-		{
-			pos.do_move(m, st);
-			cnt = leaf ? MoveList<LEGAL_ALL>(pos).size() : perft(pos, depth - 1);
-			nodes += cnt;
-			pos.undo_move(m);
-		}
-		return nodes;
-	};
-}
-
-void Position::UnitTest(Test::UnitTester& tester, IEngine& engine) {
-    auto section1 = tester.section("Position");
-
-    Position  pos;
-    StateInfo si;
-
-    // 任意局面での初期化。
-    auto pos_init = [&](const std::string& sfen_) { pos.set(sfen_, &si); };
-
-    // 平手初期化
-    auto hirate_init = [&] { pos.set_hirate(&si); };
-    // 2枚落ち初期化
-    auto handi2_sfen = "lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1";
-    auto handi2_init = [&] { pos.set(handi2_sfen, &si); };
-
-    // 4枚落ち初期化
-    auto handi4_sfen = "1nsgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1";
-    auto handi4_init = [&] { pos.set(handi4_sfen, &si); };
-
-    // 指し手生成祭りの局面
-    auto matsuri_sfen = "l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1";
-    auto matsuri_init = [&] { pos.set(matsuri_sfen, &si); };
-
-    Move16 m16;
-    Move   m;
-
-    // to_move() のテスト
-    {
-        auto section2 = tester.section("to_move()");
-
-        // 平手初期化
-        hirate_init();
-
-        // is_ok(m) == falseな指し手に対して、to_move()がその指し手をそのまま返すことを保証する。
-        tester.test("MOVE_NONE", pos.to_move(Move16::none()) == Move::none());
-        tester.test("MOVE_WIN", pos.to_move(Move16::win()) == Move::win());
-        tester.test("MOVE_NULL", pos.to_move(Move16::null()) == Move::null());
-
-        // 88の角を22に不成で移動。(非合法手) 移動後の駒は先手の角。
-        m16 = make_move16(SQ_88, SQ_22);
-        tester.test("make_move16(SQ_88, SQ_22)",
-                    pos.to_move(m16) == (Move) ((u32) m16.to_u16() + (u32) (B_BISHOP << 16)));
-
-        // 88の角を22に成る移動。(非合法手) 移動後の駒は先手の馬。
-        m16 = make_move_promote16(SQ_88, SQ_22);
-        tester.test("make_move_promote16(SQ_88, SQ_22)",
-                    pos.to_move(m16) == (Move) ((u32) m16.to_u16() + (u32) (B_HORSE << 16)));
-
-        // 22の角を88に不成で移動。(非合法手) 移動後の駒は後手の角。
-        m16 = make_move16(SQ_22, SQ_88);
-        tester.test("make_move16(SQ_22, SQ_88)", pos.to_move(m16) == Move::none());
-
-        // 22の角を88に成る移動。(非合法手) 移動後の駒は後手の馬。
-        m16 = make_move_promote16(SQ_22, SQ_88);
-        tester.test("make_move_promote16(SQ_22, SQ_88)", pos.to_move(m16) == Move::none());
-
-        matsuri_init();
-        m16 = make_move_drop16(GOLD, SQ_55);
-        tester.test("make_move_drop(SQ_55,GOLD)",
-                    pos.to_move(m16) == (Move) ((u32) m16.to_u16() + (u32) (W_GOLD << 16)));
-    }
-
-    // pseudo_legal() , legal() のテスト
-    {
-        auto section2 = tester.section("legality");
-
-        // 平手初期化
-        hirate_init();
-
-        // 77の歩を76に移動。(合法手)
-        // これはpseudo_legalではある。
-        m16 = make_move16(SQ_77, SQ_76);
-        m   = pos.to_move(m16);
-        tester.test("make_move(SQ_77, SQ_76) is pseudo_legal == true",
-                    pos.pseudo_legal(m, true) == true);
-
-#if 0
-		// 後手の駒の場合、現在の手番の駒ではないので、pseudo_legalではない。(pseudo_legalは手番側の駒であることを保証する)
-		m16 = make_move16(SQ_83, SQ_84);
-		m = pos.to_move(m16);
-		// →　pos.to_move()で現在の手番側の駒ではないからMove::none()が返るか…。このテスト、意味ないな。
-		tester.test("make_move(SQ_83, SQ_84) is pseudo_legal == false", pos.pseudo_legal(m) == false);
-#endif
-
-        // 88の先手の角を22に移動。これは途中に駒があって移動できないのでpseudo_legalではない。
-        // (pseudo_legalは、その駒が移動できる(移動先の升にその駒の利きがある)ことを保証する)
-        m16 = make_move16(SQ_88, SQ_22);
-        m   = pos.to_move(m16);
-        tester.test("make_move(SQ_88, SQ_22) is pseudo_legal == false",
-                    pos.pseudo_legal(m, true) == false);
-    }
-
-    // attacks_bb() のテスト
-    {
-        auto section2 = tester.section("attacks_bb");
-        hirate_init();
-        tester.test("attacks_by<BLACK,PAWN>", pos.attacks_by<BLACK, PAWN>() == BB_Table::RANK6_BB);
-        tester.test("attacks_by<WHITE,PAWN>", pos.attacks_by<WHITE, PAWN>() == BB_Table::RANK4_BB);
-        tester.test("attacks_by<BLACK,KNIGHT>",
-                    pos.attacks_by<BLACK, KNIGHT>()
-                      == (Bitboard(SQ_97) | Bitboard(SQ_77) | Bitboard(SQ_37) | Bitboard(SQ_17)));
-        tester.test("attacks_by<BLACK,GOLDS>",
-                    pos.attacks_by<BLACK, GOLDS>()
-                      == (goldEffect<BLACK>(SQ_69) | goldEffect<BLACK>(SQ_49)));
-        tester.test("attacks_by<WHITE,GOLDS>",
-                    pos.attacks_by<WHITE, GOLDS>()
-                      == (goldEffect<WHITE>(SQ_61) | goldEffect<WHITE>(SQ_41)));
-    }
-
-#if defined(ENABLE_QUICK_DRAW)
-	// ENABLE_QUICK_DRAWを定義していない時は、4回出現しないと千日手として扱わない。
-
-    // 千日手検出のテスト
-    {
-        auto section2 = tester.section("is_repetition");
-
-        std::deque<StateInfo> sis;
-
-        // 4手前の局面に戻っているパターン
-        BookTools::feed_position_string(pos, "startpos moves 5i5h 5a5b 5h5i 5b5a", sis);
-
-        int  found_ply;
-        auto rep = pos.is_repetition(16, found_ply);
-
-        tester.test("REPETITION_DRAW", rep == REPETITION_DRAW && found_ply == 4);
-
-        StateInfo s[512];
-        // 初期局面から先手の飛車が46,後手玉が54に移動している局面。
-        // ここから56飛(46)→44玉(54)→46飛(56)→54玉(44)で先手の反則負け
-        pos_init("lnsg1gsnl/1r5b1/ppppppppp/4k4/9/5R3/PPPPPPPPP/1B7/LNSGKGSNL b - 1");
-
-        m = pos.to_move(make_move16(SQ_46, SQ_56));
-        pos.do_move(m, s[0]);
-        m = pos.to_move(make_move16(SQ_54, SQ_44));
-        pos.do_move(m, s[1]);
-        m = pos.to_move(make_move16(SQ_56, SQ_46));
-        pos.do_move(m, s[2]);
-        m = pos.to_move(make_move16(SQ_44, SQ_54));
-        pos.do_move(m, s[3]);
-
-        // いま先手番であり、先手の反則負けが確定しているはず。
-        auto draw_value = pos.is_repetition();
-        tester.test("REPETITION_LOSE", draw_value == REPETITION_LOSE);
-
-        // 初期局面から先手の飛車が56,後手玉が54に移動している局面。(王手がかかっていて後手番)
-        // ここから44玉(54)→46飛(56)→54玉(44)→56飛(46)で(後手番において)先手の反則負け
-        pos_init("lnsg1gsnl/1r5b1/ppppppppp/4k4/9/4R4/PPPPPPPPP/1B7/LNSGKGSNL w - 1");
-
-        m = pos.to_move(make_move16(SQ_54, SQ_44));
-        pos.do_move(m, s[0]);
-        m = pos.to_move(make_move16(SQ_56, SQ_46));
-        pos.do_move(m, s[1]);
-        m = pos.to_move(make_move16(SQ_44, SQ_54));
-        pos.do_move(m, s[2]);
-        m = pos.to_move(make_move16(SQ_46, SQ_56));
-        pos.do_move(m, s[3]);
-
-        draw_value = pos.is_repetition();
-        tester.test("REPETITION_WIN", draw_value == REPETITION_WIN);
-    }
-#endif
-
-    // 入玉のテスト
-    {
-        auto section2 = tester.section("EnteringKing");
-
-        {
-            // 27点法の入玉可能点数 平手 : 先手=28,後手=27
-            auto section3 = tester.section("EKR_27_POINT");
-
-            hirate_init();
-            pos.set_ekr(EKR_27_POINT);
-
-            tester.test("hirate",
-                        pos.enteringKingPoint[BLACK] == 28 && pos.enteringKingPoint[WHITE] == 27);
-
-            // 2枚落ち初期化 , 駒落ち対応でないなら、この時も 先手=28,後手=27
-            handi2_init();
-            pos.set_ekr(EKR_27_POINT);
-
-            tester.test("handi2",
-                        pos.enteringKingPoint[BLACK] == 28 && pos.enteringKingPoint[WHITE] == 27);
-        }
-
-        {
-            // 24点法の入玉可能点数 平手 : 先手=31,後手=31
-            auto section3 = tester.section("EKR_24_POINT");
-
-            hirate_init();
-            pos.set_ekr(EKR_24_POINT);
-
-            tester.test("hirate",
-                        pos.enteringKingPoint[BLACK] == 31 && pos.enteringKingPoint[WHITE] == 31);
-
-            // 2枚落ち初期化 , 駒落ち対応でないなら、この時も 先手=31,後手=31
-            handi2_init();
-            pos.set_ekr(EKR_24_POINT);
-
-			tester.test("handi2",
-                        pos.enteringKingPoint[BLACK] == 31 && pos.enteringKingPoint[WHITE] == 31);
-        }
-
-        {
-            // 27点法の入玉可能点数 平手 : 先手=28,後手=27
-            auto section3 = tester.section("EKR_27_POINT_H");
-
-            hirate_init();
-            pos.set_ekr(EKR_27_POINT_H);
-
-            tester.test("hirate",
-                        pos.enteringKingPoint[BLACK] == 28 && pos.enteringKingPoint[WHITE] == 27);
-
-            // 2枚落ち初期化 , 駒落ち対応なので この時 上手(WHITE)=17,下手(BLACK)=28
-            handi2_init();
-            pos.set_ekr(EKR_27_POINT_H);
-            tester.test("handi2",
-                        pos.enteringKingPoint[BLACK] == 28 && pos.enteringKingPoint[WHITE] == 17);
-
-            // 4枚落ち初期化 , 駒落ち対応なので この時 上手(WHITE)=15,下手(BLACK)=28
-            handi4_init();
-            pos.set_ekr(EKR_27_POINT_H);
-            tester.test("handi4",
-                        pos.enteringKingPoint[BLACK] == 28 && pos.enteringKingPoint[WHITE] == 15);
-        }
-
-        {
-            // 24点法の入玉可能点数 平手 : 先手=31,後手=31
-            auto section3 = tester.section("EKR_24_POINT_H");
-
-            hirate_init();
-            pos.set_ekr(EKR_24_POINT_H);
-
-            tester.test("hirate",
-                        pos.enteringKingPoint[BLACK] == 31 && pos.enteringKingPoint[WHITE] == 31);
-
-            // 2枚落ち初期化 , 駒落ち対応なのでこの時 上手(WHITE)=21,下手(BLACK)=31
-            handi2_init();
-            pos.set_ekr(EKR_24_POINT_H);
-            tester.test("handi2",
-                        pos.enteringKingPoint[BLACK] == 31 && pos.enteringKingPoint[WHITE] == 21);
-
-            // 4枚落ち初期化 , 駒落ち対応なので この時 上手(WHITE)=19,下手(BLACK)=31
-            handi4_init();
-            pos.set_ekr(EKR_24_POINT_H);
-            tester.test("handi4",
-                        pos.enteringKingPoint[BLACK] == 31 && pos.enteringKingPoint[WHITE] == 19);
-        }
-    }
-
-    {
-        // 指し手生成のテスト
-        auto section2 = tester.section("GenMove");
-
-        {
-            // 23歩不成ができ、かつ、23歩不成では駒の捕獲にはならない局面。
-            pos_init("lnsgk1snl/1r4g2/p1ppppb1p/6pP1/7R1/2P6/P2PPPP1P/1SG6/LN2KGSNL b BP2p 21");
-            Move move1 = make_move(SQ_24, SQ_23, B_PAWN);
-            Move move2 = make_move_promote(SQ_24, SQ_23, B_PAWN);
-
-            Move move_buf[MAX_MOVES], *move_last;
-            // move_bufからmove_lastのなかにmoveがあるかを探す。あればtrueを返す。
-            auto find_move = [&](Move m) {
-                for (Move* em = &move_buf[0]; em != move_last; ++em)
-                    if (*em == m)
-                        return true;
-                return false;
-            };
-
-            bool all = true;
-
-            move_last = generate<QUIETS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<CAPTURES>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= !find_move(move2);
-
-            move_last = generate<NON_EVASIONS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<NON_EVASIONS_ALL>(pos, move_buf);
-            all &= find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<CAPTURES>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= !find_move(move2);
-
-            move_last = generate<CAPTURES_PRO_PLUS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<CAPTURES_PRO_PLUS_ALL>(pos, move_buf);
-            all &= find_move(
-              move1);  // 歩の不成はこちらに含めることになった。(movegenの実装の修正が難しいので)
-            all &= find_move(move2);
-
-            move_last = generate<QUIETS_PRO_MINUS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= !find_move(move2);
-
-            move_last = generate<QUIETS_PRO_MINUS_ALL>(pos, move_buf);
-            all &= !find_move(move1);  // 歩の不成はこちらには含まれていないので注意。
-            all &= !find_move(move2);
-
-            tester.test("pawn's unpromoted move", all);
-
-            // 23角不成で5手詰め
-            // https://github.com/yaneurao/YaneuraOu/issues/257
-            pos_init("5B1n1/8k/6Rpp/9/9/9/1+p7/9/K8 b rb4g4s3n4l15p 1");
-            // 23角不成(41)と23角成(41)
-            move1 = make_move(SQ_41, SQ_23, B_BISHOP);
-            move2 = make_move_promote(SQ_41, SQ_23, B_BISHOP);
-            all   = true;
-
-            move_last = generate<LEGAL_ALL>(pos, move_buf);
-            all &= find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<CAPTURES_PRO_PLUS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<QUIETS_PRO_MINUS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= !find_move(move2);
-
-            move_last = generate<CAPTURES_PRO_PLUS>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= find_move(move2);
-
-            move_last = generate<QUIETS_PRO_MINUS_ALL>(pos, move_buf);
-            all &= !find_move(move1);
-            all &= !find_move(move2);
-
-            move_last = generate<CAPTURES_PRO_PLUS_ALL>(pos, move_buf);
-            all &= find_move(move1);
-            all &= find_move(move2);
-
-            tester.test("bishop's unpromoted move", all);
-        }
-    }
-    {
-        // see_ge()のテスト
-        auto      section = tester.section("see_ge");
-        StateInfo s[512];
-
-        // 平手初期化
-        hirate_init();
-
-        // see_geのしきい値がv以下の時だけtrueが返ってくるかをテストする。
-        // つまりはsee値がvであるかをテストする関数。
-        auto see_ge_th = [&](int v) {
-            Value th     = Value(v);
-            bool  all_ok = true;
-            all_ok &= pos.see_ge(m, th);       // see_ge(m, th) == true
-            all_ok &= !pos.see_ge(m, th + 1);  // see_ge(m,  1) == false
-            all_ok &= pos.see_ge(m, th - 1);   // see_ge(m, -1) == true
-            return all_ok;
-        };
-
-        // 76歩、34歩の局面を作る。
-        m = pos.to_move(make_move16(SQ_77, SQ_76));
-        pos.do_move(m, s[0]);
-        m = pos.to_move(make_move16(SQ_33, SQ_34));
-        pos.do_move(m, s[1]);
-        // 22角成りの指し手について
-        m = pos.to_move(make_move_promote16(SQ_88, SQ_22));
-        // 角を取るが、see値は、同銀と取り返されて、駒の損得なし。
-
-        tester.test("pos1move", see_ge_th(0));
-
-        pos.do_move(m, s[2]);
-        // 馬を取り返さずにあえて84歩
-        m = pos.to_move(make_move16(SQ_83, SQ_24));
-        pos.do_move(m, s[3]);
-
-        // この局面で31馬は、同金とされて、(see値は)馬、銀の交換 = 馬を損して銀を得する
-        m = pos.to_move(make_move16(SQ_22, SQ_31));
-        tester.test("pos2move", see_ge_th(-Eval::HorseValue + Eval::SilverValue));
-
-        // この局面で33角打ちは、同桂で同馬。(see値は)角損 + 桂得。
-        m = pos.to_move(make_move_drop16(BISHOP, SQ_33));
-        tester.test("pos2drop", see_ge_th(-Eval::BishopValue + Eval::KnightValue));
-
-        // この局面で33馬は、同桂でタダ。(see値は)馬損。
-        m = pos.to_move(make_move16(SQ_22, SQ_33));
-        tester.test("pos2move", see_ge_th(-Eval::HorseValue));
-    }
-
-    {
-        // null moveのテスト
-        auto section = tester.section("nullmove");
-        matsuri_init();
-        StateInfo s[512];
-
-        // null moveして、局面情報がおかしくならないかのテスト。
-        pos.do_null_move(s[0]);
-        tester.test("pos_is_ok()", pos.pos_is_ok());
-    }
-
-    {
-        // packed sfenのテスト
-        auto section = tester.section("PackedSfen");
-
-        vector<string> test_sfens = {
-          "lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w -",
-          "lns1kgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w -",
-          "lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGK4 w -",
-          "lnsgk4/9/ppppppppp/9/9/9/PPPPPPPPP/9/LNSGK4 w GBRgbr",
-        };
-
-        // packed by cshogi
-        /*
-			board = cshogi.Board()
-			psfen = np.zeros(32, dtype=np.uint8)
-			board.set_sfen(sfen)
-			board.to_psfen(psfen)
-			print(np.array2string(psfen, separator=', '))
-		*/
-        vector<PackedSfen> packed_sfens = {
-          {89,  164, 81, 34, 12,  171, 68, 252, 44,  167, 68, 56, 94,  137, 240, 72,
-           132, 87,  34, 60, 167, 68,  56, 86,  137, 248, 88, 70, 137, 48,  188, 126},
-          {89, 164, 81,  34, 12, 171, 68,  252, 44,  167, 68, 56, 94,  137, 240, 72,
-           4,  18,  225, 57, 37, 194, 177, 74,  196, 199, 50, 74, 132, 97,  191, 126},
-          {89,  164, 81, 34,  88, 37,  226, 199, 41,  17,  188, 18, 129, 68,  120, 37,
-           194, 115, 74, 132, 99, 149, 136, 143, 101, 148, 8,   67, 106, 107, 191, 126},
-          {89,  36,  18, 1,  137, 128, 68,  64,  34, 144, 8,   175, 68,  120, 78,  137,
-           112, 172, 18, 97, 25,  37,  194, 112, 30, 159, 251, 252, 166, 212, 218, 90}};
-
-        bool success = true;
-        for (size_t i = 0; i < test_sfens.size(); ++i)
-        {
-            auto  sfen        = test_sfens[i];
-            auto& packed_sfen = packed_sfens[i];
-
-            StateInfo si;
-            pos.set(sfen, &si);
-
-            PackedSfen ps;
-            pos.sfen_pack(ps);
-
-            // バイナリ列として一致するか。
-            success &= ps == packed_sfen;
-
-            // decodeで元のsfenになることは、このあとのランダムプレイヤーのテストで散々やっているから
-            // ここでやる必要なし。
-        }
-        tester.test("handicapped sfen", success);
-    }
-
-    {
-        // 部分hashkeyのテスト
-        auto section = tester.section("PartialKey");
-        {
-            PRNG     my_rand(114514);
-            Position pos2;
-
-            bool ok = true;
-
-            for (int i = 0; i < 1000; ++i)
-            {
-                StateInfo si[MAX_PLY];
-                pos.set_hirate(&si[0]);
-                for (int j = 1; j < MAX_PLY; ++j)
-                {
-                    MoveList<LEGAL_ALL> ml(pos);
-
-                    // 指し手がない == 負け == 終了
-                    if (ml.size() == 0)
-                        break;
-
-                    Move m = Move(ml.at(size_t(my_rand.rand(ml.size()))));
-                    pos.do_move(m, si[j + 1]);
-
-					// 📓 sfen経由でset()を呼び出す。この時、set()によってpartial keyが初期化される。
-					//     差分更新したpartial keyと一致するかをテストする。
-
-					auto      sfen = pos.sfen();
-                    StateInfo si2;
-                    pos2.set(sfen, &si2);
-
-                    // clang-format off
-
-                    // 部分keyが一致するか。
-                    ok &= pos.state()->board_key     == pos2.state()->board_key;
-                    ok &= pos.state()->hand_key      == pos2.state()->hand_key;
-                    ok &= pos.state()->pawnKey       == pos2.state()->pawnKey;
-                    ok &= pos.state()->nonPawnKey[0] == pos2.state()->nonPawnKey[0];
-                    ok &= pos.state()->nonPawnKey[1] == pos2.state()->nonPawnKey[1];
-                    ok &= pos.state()->materialKey   == pos2.state()->materialKey;
-                    ok &= pos.state()->minorPieceKey == pos2.state()->minorPieceKey;
-
-                    // clang-format on
-
-                    //if (!ok)
-                    //    tester.test("game " + to_string(i) + " ply = " + to_string(j), ok);
-                }
-            }
-            tester.test("partial hash key", ok);
-        }
-    }
-
-    {
-        // それ以外のテスト
-        auto section = tester.section("misc");
-        {
-            // 盤面の反転
-
-            // 23歩不成ができ、かつ、23歩不成では駒の捕獲にはならない局面。
-            pos_init("lnsgk1snl/1r4g2/p1ppppb1p/6pP1/7R1/2P6/P2PPPP1P/1SG6/LN2KGSNL b BP2p 21");
-            auto flipped = pos.flipped_sfen();
-            tester.test(
-              "flip sfen",
-              flipped == "lnsgk2nl/6gs1/p1pppp2p/6p2/1r7/1pP6/P1BPPPP1P/2G4R1/LNS1KGSNL w 2Pbp 21");
-        }
-    }
-
-    {
-        // 深いdepthのperftのテストが通っていれば、利きの計算、指し手生成はおおよそ間違っていないと言える。
-
-        auto section2 = tester.section("Perft");
-
-        {
-            auto section3 = tester.section("hirate");
-            hirate_init();
-            const s64 p_nodes[] = {0, 30, 900, 25470, 719731, 19861490, 547581517};
-
-            for (Depth d = 1; d <= 6; ++d)
-            {
-                u64 nodes = perft(pos, d);
-                u64 pn    = p_nodes[d];
-                tester.test("depth " + to_string(d) + " = " + to_string(pn),
-                            nodes == pn && pos.pos_is_ok());
-            }
-        }
-
-        {
-            auto section3 = tester.section("matsuri");
-            matsuri_init();
-
-            const s64 p_nodes[] = {0, 207, 28684, 4809015, 516925165};
-
-            for (Depth d = 1; d <= 4; ++d)
-            {
-                u64 nodes = perft(pos, d);
-                u64 pn    = p_nodes[d];
-                tester.test("depth " + to_string(d) + " = " + to_string(nodes),
-                            nodes == pn && pos.pos_is_ok());
-            }
-        }
-    }
-
-    // ランダムプレイヤーでの対局によるテスト
-
-    // packed sfenのtest
-    auto extra_test1 = [&](Position& pos) {
-        PackedSfen ps;
-        StateInfo  si;
-        string     sfen     = pos.sfen();
-        int        game_ply = pos.game_ply();
-        pos.sfen_pack(ps);
-
-        Position pos2;
-        pos2.set_from_packed_sfen(ps, &si);
-        string sfen2 = pos2.sfen(game_ply);
-
-        return sfen == sfen2;
-    };
-
-    // 駒落ちのpacked sfenのテスト
-    auto extra_test2 = [&](Position& pos) {
-        PackedSfen ps;
-        StateInfo  si;
-        string     sfen     = pos.sfen();
-        int        game_ply = pos.game_ply();
-        pos.sfen_pack(ps);
-
-        Position pos2;
-        pos2.set_from_packed_sfen(ps, &si);
-        // ここから駒を5枚ほど落とす。
-        int count = 0;
-        for (auto sq : SQ)
-        {
-            auto pc = pos2.piece_on(sq);
-            if (pc != NO_PIECE && type_of(pc) != KING)
-            {
-                pos2.board[sq] = NO_PIECE;  // 自分のclass内なので直接書き換えてしまう。
-                if (++count >= 5)
-                    break;
-            }
-        }
-        string sfen2 = pos2.sfen(game_ply);
-        pos2.sfen_pack(ps);  // 駒落ちのpacked sfenができた。
-
-        Position pos3;
-        pos3.set_from_packed_sfen(ps, &si);
-
-        string sfen3 = pos3.sfen(game_ply);
-
-        return sfen2 == sfen3;
-    };
-
-    {
-        // 対局回数→0ならskip
-        s64 random_player_loop = tester.options["random_player_loop"];
-        if (random_player_loop)
-        {
-            auto section2 = tester.section("GamesOfRandomPlayer");
-
-            // seed固定乱数(再現性ある乱数)
-            PRNG      my_rand(114514);
-            StateInfo s[512];
-
-            for (s64 i = 0; i < random_player_loop; ++i)
-            {
-                // 平手初期化
-                hirate_init();
-                bool fail = false;
-
-                // 512手目まで
-                for (int ply = 0; ply < 512; ++ply)
-                {
-                    MoveList<LEGAL_ALL> ml(pos);
-
-                    // 指し手がない == 負け == 終了
-                    if (ml.size() == 0)
-                        break;
-
-                    Move m = Move(ml.at(size_t(my_rand.rand(ml.size()))));
-
-                    pos.do_move(m, s[ply]);
-
-                    if (!pos.pos_is_ok() || !extra_test1(pos) || !extra_test2(pos))
-                        fail = true;
-                }
-
-                // 今回のゲームのなかでおかしいものがなかったか
-                tester.test(string("game ") + to_string(i + 1), !fail);
-            }
-        }
-    }
-}
-
 
 // ----------------------------------
 //         明示的な実体化
