@@ -92,11 +92,9 @@ static void* aligned_large_pages_alloc_windows([[maybe_unused]] size_t allocSize
       []() { return (void*) nullptr; });
 }
 
-#if !STOCKFISH
 // 🌈 やねうら王独自
 // 初回のlarge pageのallocationに対してメッセージを出力するためのフラグ。
 bool first_large_pages_allocation = true;
-#endif
 
 void* aligned_large_pages_alloc(size_t allocSize) {
 
@@ -114,7 +112,6 @@ void* aligned_large_pages_alloc(size_t allocSize) {
     if (!mem)
         mem = VirtualAlloc(nullptr, allocSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
-#if !STOCKFISH
 	else
 	{
 		// 🌈 やねうら王独自
@@ -127,7 +124,6 @@ void* aligned_large_pages_alloc(size_t allocSize) {
 			first_large_pages_allocation = false;
 		}
 	}
-#endif
 
     return mem;
 }

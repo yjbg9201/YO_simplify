@@ -726,14 +726,8 @@ enum MoveEnum : uint32_t {
 // 普通の指し手か成りの指し手かを判定するのに用いる。
 enum MoveType : uint16_t {
     NORMAL,
-#if STOCKFISH
-    PROMOTION  = 1 << 14,
-    EN_PASSANT = 2 << 14,
-    CASTLING   = 3 << 14
-#else
     PROMOTION     = MOVE_PROMOTE,
     DROP          = MOVE_DROP,
-#endif
 };
 
 // 指し手を表現するclass(実体は32bit整数)

@@ -19,7 +19,6 @@ namespace YaneuraOu {
 // benchmark用のコマンドその2
 constexpr auto BenchmarkCommand = "speedtest";
 
-#if !STOCKFISH
 
 // Engine開発者が用いる"test"コマンド。
 namespace Test {
@@ -28,7 +27,6 @@ void test_cmd(IEngine& engine, std::istringstream& is);
 
 // 定跡を作るコマンド
 
-#endif
 
 /*
 	📓 複数のlambda型を1つにまとめるtemplate。
@@ -63,27 +61,6 @@ void USIEngine::print_info_string(std::string_view str) {
 	sync_cout_end();
 }
 
-#if STOCKFISH
-UCIEngine::UCIEngine(int argc, char** argv) :
-    engine(argv[0]),
-    // 📌 やねうら王では、Engine engineは、あとからset_engine()で渡すように変更した。
-    cli(argc, argv) {
-    // 📌  やねうら王では、CommandLine::gが持つようになったのでこのclassには持たせない。
-
-    engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
-        if (str.has_value())
-            print_info_string(*str);
-    });
-
-    // 📝 Stockfishでは"uci"が来る前に"info string"でオプション内容を出力している。
-    //     やねうら王では、この機能、サポートしない。
-
-    // すべての読み筋出力listenerを初期化する。
-    //init_search_update_listeners();
-    // 📝 やねうら王では、外部からEngine派生classをset_engine()でセットするので、
-    //     そのタイミングで呼び出さないと駄目。
-}
-#else
 
 void USIEngine::set_engine(IEngine& _engine) {
     engine.set_engine(_engine);
@@ -120,7 +97,6 @@ void USIEngine::set_engine(IEngine& _engine) {
     init_search_update_listeners();
 }
 
-#endif
 
 // すべての読み筋出力listenerを初期化する。
 void USIEngine::init_search_update_listeners() {
@@ -160,30 +136,11 @@ void USIEngine::loop()
 // 📝 wasm版対応のため、関数を分離する必要があった。
 bool USIEngine::usi_cmdexec(const std::string& cmd) {
 
-#if STOCKFISH
-    string token, cmd;
-    for (int i = 1; i < cli.argc; ++i)
-        cmd += std::string(cli.argv[i]) + " ";
-
-    do
-    {
-
-        if (cli.argc == 1 && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
-                                                       // 入力またはファイル終端（EOF）の指示を待つ
-            cmd = "quit";
-
-        token.clear();  // Avoid a stale if getline() returns nothing or a blank line
-                        // getline() が何も返さない場合や空行を返す場合に備えて、古い（不正確な）データを回避する
-#else
     std::string token;
-#endif
 
     std::istringstream is(cmd);
     is >> std::skipws >> token;
 
-#if STOCKFISH
-    if (token == "quit" || token == "stop")
-#else
     if (token == "quit" || token == "stop" || token == "gameover")
     /*
 	📓 USIプロトコルにはUCIプロトコルから、
@@ -197,7 +154,6 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
 		gameoverに対してはbestmoveは返すべきではないのかも知れないが、
         それを言えばstopにだって…。
 	*/
-#endif
         // "stop"コマンドが来るとEngine.stop()が呼び出され、その結果threads.stop = trueとなる。
         engine.stop();
 
@@ -212,9 +168,6 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
     // 探索は継続すべきだが、ポンダリングから通常の探索に切り替える必要がある。
 
     else if (token == "ponderhit")
-#if STOCKFISH
-        engine.set_ponderhit(false);
-#else
     {
         // Stochastic Ponder中にhitした。
         if (engine.get_options().count("Stochastic_Ponder")
@@ -241,20 +194,10 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
 		else
 	        engine.set_ponderhit(false);
     }
-#endif
 
     // 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
     else if (token == "usi")
-#if STOCKFISH
-    {
-        sync_cout << "id name " << engine_info(true) << "\n"
-                    << engine.get_options() << sync_endl;
-
-        sync_cout << "uciok" << sync_endl;
-    }
-#else
         engine.usi();
-#endif
 
     // オプションを設定する
     else if (token == "setoption")
@@ -265,47 +208,24 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
         // send info strings after the go command is sent for old GUIs and python-chess
         // 古いGUIやpython-chessのために、goコマンド送信後にinfo文字列を送信する。
 
-#if STOCKFISH
-        print_info_string(engine.numa_config_information_as_string());
-        print_info_string(engine.thread_allocation_information_as_string());
-        /*
-		📓 以下のようなメッセージを出力する。要らんと思う..。
-        	info string Available processors : 0 - 31
-        	info string Using 4 thread
-	*/
-#else
 		// Stochastic Ponderのために"go"コマンド行を保存しておく。
         last_go_cmd_string = cmd;
-#endif
         go(is);
     }
 
     else if (token == "position")
-#if STOCKFISH
-        position(is);
-#else
     {
 		// Stochastic Ponderのために保存しておく。
         last_position_cmd_string = cmd;
         position(is);
     }
-#endif
 
-#if STOCKFISH
-    else if (token == "ucinewgame")
-        engine.search_clear();
-#else
     else if (token == "usinewgame")
         engine.usinewgame();
-#endif
 
     // 思考エンジンの準備が出来たかの確認
     else if (token == "isready")
-#if STOCKFISH
-        sync_cout << "readyok" << sync_endl;
-#else
         isready();
-#endif
 
     // Add custom non-UCI commands, mainly for debugging purposes.
     // These commands must not be used during a search!
@@ -336,19 +256,6 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
     else if (token == "compiler")
         sync_cout << compiler_info() << sync_endl;
 
-#if STOCKFISH
-    else if (token == "--help" || token == "help" || token == "--license" || token == "license")
-        sync_cout << "\nStockfish is a powerful chess engine for playing and analyzing."
-                        "\nIt is released as free software licensed under the GNU GPLv3 License."
-                        "\nStockfish is normally used with a graphical user interface (GUI) and implements"
-                        "\nthe Universal Chess Interface (UCI) protocol to communicate with a GUI, an API, etc."
-                        "\nFor any further information, visit https://github.com/official-stockfish/Stockfish#readme"
-                        "\nor read the corresponding README.md and LICENSE files distributed along with this program.\n"
-                    << sync_endl;
-
-    else if (!token.empty() && token[0] != '#')
-        sync_cout << "Unknown command: '" << cmd << "'. Type help for more information." << sync_endl;
-#else
 
 	// --------------------------------
     // 📌 以下、やねうら王独自拡張 📌
@@ -407,25 +314,17 @@ bool USIEngine::usi_cmdexec(const std::string& cmd) {
             sync_cout << ss << sync_endl;
         }
     }
-#endif
 
 
-#if STOCKFISH
-    } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
-#else
     // "quit"に対しては、この関数はtrueを返す。
     return token == "quit";
-#endif
 }
 
 
 // コマンドラインを解析して、Search::LimitsTypeに反映させて返す。
 Search::LimitsType USIEngine::parse_limits(std::istream& is) {
 
-#if STOCKFISH
-#else
     const auto& options = engine.get_options();
-#endif
 
 	Search::LimitsType limits;
 	std::string        token;
@@ -461,13 +360,9 @@ Search::LimitsType USIEngine::parse_limits(std::istream& is) {
 			// 残りの指し手すべてをsearchMovesに突っ込む。
 			while (is >> token)
 			{
-#if STOCKFISH
-				limits.searchmoves.push_back(to_lower(token));
-#else
 				// チェスUCIではsearchmovesを小文字化しても問題ないが、将棋USIでは
 				// "P*5e"のように打ち駒の駒種を大文字で表すので、大文字小文字を保持する。
 				limits.searchmoves.push_back(token);
-#endif
 			}
 		}
 
@@ -483,12 +378,6 @@ Search::LimitsType USIEngine::parse_limits(std::istream& is) {
 		else if (token == "binc")
 			is >> limits.inc[BLACK];
 
-#if STOCKFISH
-		// あと何手で引き分けとなるか。
-		// 🤔 やねうら王ではサポートしない。GUIが対応していないし…。
-		else if (token == "movestogo")
-			is >> limits.movestogo;
-#else
         // 秒読み設定。
         // 📝 USIでは"byoyomi"として指定できる。
         else if (token == "byoyomi")
@@ -511,7 +400,6 @@ Search::LimitsType USIEngine::parse_limits(std::istream& is) {
 		else if (token == "rtime")
             is >> limits.rtime;
 
-#endif
         // この探索深さで探索を打ち切る
         else if (token == "depth")
 			is >> limits.depth;
@@ -527,10 +415,6 @@ Search::LimitsType USIEngine::parse_limits(std::istream& is) {
         // 詰み探索。
 		// 📝 UCIではこのあとには手数が入っており、その手数以内に詰むかどうかを判定するが、
         //     USIでは、ここは探索のための時間制限に変更となっている。
-#if STOCKFISH
-		else if (token == "mate")
-			is >> limits.mate;
-#else
         else if (token == "mate")
         {
             token.clear();
@@ -544,7 +428,6 @@ Search::LimitsType USIEngine::parse_limits(std::istream& is) {
 				//     探索に使う時間[ms]が指定されている。
                 limits.mate = stoi(token);
         }
-#endif
 
 		/* 📓 perftとは？
 		       パフォーマンステストの略。
@@ -581,9 +464,6 @@ void USIEngine::go(std::istringstream& is)
 	if (limits.perft)
 		perft(limits);
 	else
-#if STOCKFISH
-		engine.go(limits);
-#else
 	{
 		// Stochastic Ponderが有効なときに"go ponder"が送られてきたら、
 		// last_position_cmd_stringから1手戻した局面に変更してからgo ponderする。
@@ -605,7 +485,6 @@ void USIEngine::go(std::istringstream& is)
 
 		engine.go(limits);
 	}
-#endif
 }
 
 // "bench"コマンドの応答部。
@@ -618,17 +497,11 @@ void USIEngine::bench(std::istream& args) {
 
     engine.set_on_update_full([&](const auto& i) {
         nodesSearched = i.nodes;
-#if STOCKFISH
-        on_update_full(i, options["UCI_ShowWDL"]);
-#else
         on_update_full(i);
-#endif
     });
 
-#if !STOCKFISH
 	// USIEngine::isready()を呼び出してやらかないと"engine_options.txt"などの読み込みが行われない。
     isready();
-#endif
 
     std::vector<std::string> list = Benchmark::setup_bench(engine.sfen(), args);
 
@@ -648,10 +521,8 @@ void USIEngine::bench(std::istream& args) {
             {
                 Search::LimitsType limits = parse_limits(is);
 
-#if !STOCKFISH
                 // benchではPV出力間隔を無効化し、最後のinfo nodesを探索終了時点の値に揃える。
                 limits.disablePvInterval = true;
-#endif
 
                 if (limits.perft)
                     nodesSearched = perft(limits);
@@ -695,11 +566,7 @@ void USIEngine::bench(std::istream& args) {
     // reset callback, to not capture a dangling reference to nodesSearched
     // コールバックをリセットする。nodesSearched へのダングリング参照を捕捉しないようにするため。
 
-#if STOCKFISH
-    engine.set_on_update_full([&](const auto& i) { on_update_full(i, options["UCI_ShowWDL"]); });
-#else
     engine.set_on_update_full([&](const auto& i) { on_update_full(i); });
-#endif
 }
 
 void USIEngine::benchmark(std::istream& args) {
@@ -719,35 +586,22 @@ void USIEngine::benchmark(std::istream& args) {
     engine.set_on_bestmove([](const auto&, const auto&) {});
     engine.set_on_verify_networks([](const auto&) {});
 
-#if !STOCKFISH
 	// USIEngine::isready()を呼び出してやらかないと"engine_options.txt"などの読み込みが行われない。
     isready();
-#endif
 
     Benchmark::BenchmarkSetup setup = Benchmark::setup_benchmark(args);
 
-#if STOCKFISH
-    const int numGoCommands = count_if(setup.commands.begin(), setup.commands.end(), [](const std::string& s) { return s.find("go ") == 0; });
-#else
 	// 🤔 警告がでかねないので修正しておく。
 	const size_t numGoCommands = count_if(setup.commands.begin(), setup.commands.end(),
                                        [](const std::string& s) { return s.find("go ") == size_t(0); });
-#endif
 
     TimePoint totalTime = 0;
 
     // Set options once at the start.
     auto ss = std::istringstream("name Threads value " + std::to_string(setup.threads));
     setoption(ss);
-#if STOCKFISH
-	ss = std::istringstream("name Hash value " + std::to_string(setup.ttSize));
-    setoption(ss);
-    ss = std::istringstream("name UCI_Chess960 value false");
-    setoption(ss);
-#else
     ss = std::istringstream("name USI_Hash value " + std::to_string(setup.ttSize));
     setoption(ss);
-#endif
 
     // Warmup
     for (const auto& cmd : setup.commands)
@@ -905,13 +759,6 @@ void USIEngine::position(std::istringstream& is) {
     }
     // 局面がfen形式で指定されているなら、その局面を読み込む。
     // UCI(チェスプロトコル)ではなくUSI(将棋用プロトコル)だとここの文字列は"fen"ではなく"sfen"
-#if STOCKFISH
-    else if (token == "fen")
-        while (is >> token && token != "moves")
-            fen += token + " ";
-    else
-        return;
-#else
     // 💡 この"sfen"という文字列は省略可能にしたいので
     //     Stockfishのコードを少し工夫して書き換える。
     else
@@ -923,7 +770,6 @@ void USIEngine::position(std::istringstream& is) {
         while (is >> token && token != "moves")
             sfen += token + " ";
     }
-#endif
 
     std::vector<std::string> moves;
 
@@ -940,44 +786,6 @@ void USIEngine::position(std::istringstream& is) {
     }
 }
 
-#if STOCKFISH
-
-namespace {
-
-struct WinRateParams {
-    double a;
-    double b;
-};
-
-WinRateParams win_rate_params(const Position& pos) {
-
-    int material = pos.count<PAWN>() + 3 * pos.count<KNIGHT>() + 3 * pos.count<BISHOP>() + 5 * pos.count<ROOK>() + 9 * pos.count<QUEEN>();
-
-    // The fitted model only uses data for material counts in [17, 78], and is anchored at count 58.
-    double m = std::clamp(material, 17, 78) / 58.0;
-
-    // Return a = p_a(material) and b = p_b(material), see github.com/official-stockfish/WDL_model
-    constexpr double as[] = {-13.50030198, 40.92780883, -36.82753545, 386.83004070};
-    constexpr double bs[] = {96.53354896, -165.79058388, 90.89679019, 49.29561889};
-
-    double a = (((as[0] * m + as[1]) * m + as[2]) * m) + as[3];
-    double b = (((bs[0] * m + bs[1]) * m + bs[2]) * m) + bs[3];
-
-    return {a, b};
-}
-
-// The win rate model is 1 / (1 + exp((a - eval) / b)), where a = p_a(material) and b = p_b(material).
-// It fits the LTC fishtest statistics rather accurately.
-int win_rate_model(Value v, const Position& pos) {
-
-    auto [a, b] = win_rate_params(pos);
-
-    // Return the win rate in per mille units, rounded to the nearest integer.
-    return int(0.5 + 1000 / (1 + std::exp((a - double(v)) / b)));
-}
-}
-
-#endif
 
 
 // Score構造体の内容をUSI形式のscoreとして出力する。
@@ -985,20 +793,9 @@ std::string USIEngine::format_score(const Score& s) {
     constexpr int TB_CP = 20000;
     const auto    format =
       overload{[](Score::Mate mate) -> std::string {
-#if STOCKFISH
-                   auto m = (mate.plies > 0 ? (mate.plies + 1) : mate.plies) / 2;
-        // 📝 UCIだと先後1手ずつで mate Xと出力しているらしく、2で割ってある。
-#else
                    auto m = mate.plies;
-#endif
                    return std::string("mate ") + std::to_string(m);
                },
-#if STOCKFISH
-               [](Score::Tablebase tb) -> std::string {
-                   return std::string("cp ")
-                        + std::to_string((tb.win ? TB_CP - tb.plies : -TB_CP - tb.plies));
-               },
-#endif
                [](Score::InternalUnits units) -> std::string {
                    return std::string("cp ") + std::to_string(units.value);
                }};
@@ -1013,34 +810,9 @@ constexpr int NormalizeToPawnValue = Eval::PawnValue;
 /// Turns a Value to an integer centipawn number,
 /// without treatment of mate and similar special scores.
 // 詰みやそれに類似した特別なスコアの処理なしに、Valueを整数のセントポーン数に変換する。
-#if STOCKFISH
-int UCIEngine::to_cp(Value v, const Position& pos) {
-
-    // In general, the score can be defined via the WDL as
-    // (log(1/L - 1) - log(1/W - 1)) / (log(1/L - 1) + log(1/W - 1)).
-    // Based on our win_rate_model, this simply yields v / a.
-
-    auto [a, b] = win_rate_params(pos);
-
-    return std::round(100 * int(v) / a);
-}
-
-std::string UCIEngine::wdl(Value v, const Position& pos) {
-    std::stringstream ss;
-
-    int wdl_w = win_rate_model(v, pos);
-    int wdl_l = win_rate_model(-v, pos);
-    int wdl_d = 1000 - wdl_w - wdl_l;
-    ss << wdl_w << " " << wdl_d << " " << wdl_l;
-
-    return ss.str();
-}
-
-#else
 
 int USIEngine::to_cp(Value v) { return 100 * v / NormalizeToPawnValue; }
 
-#endif
 
 // Square型をUSI文字列に変換する
 std::string USIEngine::square(Square s) {
@@ -1048,10 +820,6 @@ std::string USIEngine::square(Square s) {
 }
 
 // 指し手をUSI文字列に変換する。
-#if STOCKFISH
-std::string USIEngine::move(Move m , bool chess960) { return USIEngine::move(m.to_move16()); }
-
-#else
 
 std::string USIEngine::move(Move m /*, bool chess960*/) { return USIEngine::move(m.to_move16()); }
 
@@ -1091,7 +859,6 @@ std::string USIEngine::move(const std::vector<Move>& moves)
 	}
 	return oss.str();
 }
-#endif
 
 // string全体を小文字化して返す。
 std::string USIEngine::to_lower(std::string str) {
@@ -1103,22 +870,6 @@ std::string USIEngine::to_lower(std::string str) {
 // USIの指し手文字列をMove型の変換する。
 // 合法手でなければMove::noneを返すようになっている。
 // 💡 合法でない指し手の場合、エラーである旨を出力する。
-#if STOCKFISH
-Move USIEngine::to_move(const Position& pos, std::string str) {
-    str = to_lower(str);
-    // ⇨  将棋(USIプロトコル)では、駒打ちの時に大文字と小文字の区別があるので、
-    //	  小文字化して比較することはできない。
-
-    // 全合法手のなかからusi文字列に変換したときにstrと一致する指し手を探してそれを返す
-    for (const auto& m : MoveList<LEGAL>(pos))
-        if (str == move(m, pos.is_chess960()))
-            return m;
-    // 📝 のコードは大変美しいコードではあるが、
-    //     棋譜を大量に読み込むときに時間がかかるうるのでもっと高速な実装をする。
-
-    return Move::none();
-}
-#else
 Move USIEngine::to_move(const Position& pos, std::string str) {
 
 	if (str == "resign")
@@ -1205,7 +956,6 @@ Square USIEngine::to_square(const std::string& str) {
     return usi_to_sq(str[0], str[1]);
 }
 
-#endif
 
 void USIEngine::on_update_no_moves(const Engine::InfoShort& info) {
     sync_cout << "info depth " << info.depth << " score " << format_score(info.score) << sync_endl;
@@ -1217,12 +967,6 @@ void USIEngine::on_update_full(const Engine::InfoFull& info /*, bool showWDL */)
 
     ss << "info";
 
-#if STOCKFISH
-	ss << " depth " << info.depth                 //
-       << " seldepth " << info.selDepth           //
-       << " multipv " << info.multiPV             //
-       << " score " << format_score(info.score);  //
-#else
 
 	ss << " depth " << info.depth;
 
@@ -1232,22 +976,14 @@ void USIEngine::on_update_full(const Engine::InfoFull& info /*, bool showWDL */)
 
 	ss << " multipv " << info.multiPV             //
        << " score " << format_score(info.score);  //
-#endif
 
     if (!info.bound.empty())
         ss << " " << info.bound;
 
-#if STOCKFISH
-    if (showWDL)
-        ss << " wdl " << info.wdl;
-#endif
 
     ss << " nodes " << info.nodes        //
        << " nps " << info.nps            //
        << " hashfull " << info.hashfull  //
-#if STOCKFISH
-       << " tbhits " << info.tbHits  //
-#endif
        << " time " << info.timeMs  //
        << " pv " << info.pv;       //
 

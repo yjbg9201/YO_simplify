@@ -93,12 +93,6 @@ void dbg_print();
 //  Time[ms] wrapper
 // --------------------
 
-#if STOCKFISH
-// ms単位での時間計測しか必要ないのでこれをTimePoint型のように扱う。
-// TimePointの定義。💡 やねうら王では、types.hに移動。
-//using TimePoint = std::chrono::milliseconds::rep;  // A value in milliseconds
-//static_assert(sizeof(TimePoint) == sizeof(int64_t), "TimePoint should be 64 bits");
-#endif
 
 
 // ms単位で現在時刻を返す
@@ -108,9 +102,6 @@ static TimePoint now() {
     // 💡 10倍早く時間が経過するようにして、持ち時間制御のテストなどを行う時は↑このように10をかけ算する。
 }
 
-#if STOCKFISH
-
-#else
 // 🌈 時間計測用。経過時間を計測する。
 struct ElapsedTimer {
     ElapsedTimer();
@@ -131,7 +122,6 @@ struct ElapsedTimer {
     TimePoint startTime;
 };
 
-#endif
 
 // --------------------
 //  sync_out/sync_endl

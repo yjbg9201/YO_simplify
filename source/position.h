@@ -58,24 +58,12 @@ struct StateInfo {
 	// 歩以外の駒によるhash key(盤上のみ)
     Key nonPawnKey[COLOR_NB];
 
-#if STOCKFISH
-	// 歩以外の駒割。
-	// 🤔 やねうら王では使っていない。使ったほうがいいか？
-    Value nonPawnMaterial[COLOR_NB];
-
-    int castlingRights;
-    int rule50;
-#endif
 
 	// 遡り可能な手数(previousポインタを用いて局面を遡るときに用いる)
 	int pliesFromNull;
 
-#if STOCKFISH
-    Square epSquare;
-#else
     // 🌈 この手番側の連続王手は何手前からやっているのか(連続王手の千日手の検出のときに必要)
     int continuousCheck[COLOR_NB];
-#endif
 
 
 
@@ -84,9 +72,6 @@ struct StateInfo {
 	// Not copied when making a move (will be recomputed anyhow)
 	// 指し手で局面を進めるときにコピーされない(なんにせよ再計算される)
 
-#if STOCKFISH
-	Key        key;
-#else
 	// 盤面(盤上の駒)と手駒に関するhash key
 	// 直接アクセスせずに、hand_key()、board_key(),key()を用いること。
 
@@ -112,7 +97,6 @@ struct StateInfo {
 
 	Key key() const { return board_key ^ hand_key; }
 
-#endif
 
 	// 現局面で手番側に対して王手をしている駒のbitboard
 	Bitboard checkersBB;
@@ -157,7 +141,6 @@ struct StateInfo {
     //  -ply  = ply前の局面と同じ局面であることを示す。4回目の繰り返しに到達していることを示す。
     int repetition;
 
-#if !STOCKFISH
     //  繰り返された回数 - 1。
     //  📝 repetition != 0の時に意味をなす。
 	//      将棋では同じ局面は連続4回目で千日手が成立するのでこのためのカウンター。
@@ -165,15 +148,12 @@ struct StateInfo {
 
     //  その時の繰り返しの種類
     RepetitionState repetition_type;
-#endif
 
 #endif
 
 
-#if !STOCKFISH
 	// この局面における手番側の持ち駒。優等局面の判定のために必要。
 	Hand hand;
-#endif
 
 	// --- evaluate
 
@@ -294,16 +274,11 @@ public:
 
 		局面を遡るために、rootまでの局面の情報が必要であるから、それを引数のsiで渡してやる。
 	*/
-#if STOCKFISH
-	Position& set(const std::string& fenStr,bool isChess960, StateInfo* si);
-    Position& set(const std::string& code, Color c, StateInfo* si);
-#else
     std::optional<PositionSetError> set(const std::string& sfenStr, StateInfo* si);
 
 	// 平手の初期盤面を設定する。
     // siについては、上記のset()にある説明を読むこと。
     std::optional<PositionSetError> set_hirate(StateInfo* si) { return set(StartSFEN, si); }
-#endif
 
 	// 局面のsfen文字列を取得する
 	// 📝 USIプロトコルにおいては不要な機能ではあるが、デバッグのために局面を標準出力に出力して
@@ -311,9 +286,6 @@ public:
 	//    引数としてintを取るほうのsfen()は、出力するsfen文字列の末尾の手数を指定できるバージョン。
 	// 💡 裏技 : gamePlyが負なら、sfen文字列末尾の手数を出力しない。
 
-#if STOCKFISH
-    std::string fen() const;
-#else
 	const std::string sfen() const { return sfen(game_ply()); }
 	const std::string sfen(int gamePly) const;
 
@@ -324,7 +296,6 @@ public:
 	// sfen文字列をflip(先後反転)したsfen文字列に変換する。
 	static const std::string sfen_to_flipped_sfen(std::string sfen);
 
-#endif
 
 
 	// c側の手駒を返す。
@@ -419,31 +390,14 @@ public:
     Piece piece_on(Square sq) const;
 
 	// (盤上の)駒の配列をもらう。
-#if STOCKFISH
-    const std::array<Piece, SQUARE_NB>& piece_array() const;
-#else
     const std::array<Piece, SQ_NB_PLUS1>& piece_array() const;
-#endif
 
-#if STOCKFISH
-    Square ep_square() const;
-#else
 	// 駒がない升が1になっているBitboardが返る
     Bitboard empties() const { return pieces() ^ Bitboard(1); }
-#endif
 
 	// マスsに駒がなければtrueが返る。
     bool empty(Square s) const;
 
-#if STOCKFISH
-	// 駒の枚数を返す。
-    template<PieceType Pt>
-    int count(Color c) const;
-
-	// 駒の枚数を返す。(先後のPtの合計)
-    template<PieceType Pt>
-    int count() const;
-#endif
 
 	// c側のPtの場所(1枚しかない場合)を取得する。
     // ⚠ やねうら王では、Pt == KINGに対してしか使えないが、Stockfishも
@@ -457,11 +411,6 @@ public:
     // -----------------------
 
 	// 💡 将棋では使わない。
-#if STOCKFISH
-    bool   can_castle(CastlingRights cr) const;
-    bool   castling_impeded(CastlingRights cr) const;
-    Square castling_rook_square(CastlingRights cr) const;
-#endif
 
 	// -----------------------
     //      Checking
@@ -486,7 +435,6 @@ public:
 	// 　すなわち、pinされている駒が移動した時に、この大駒によって王が素抜きにあう。
 	Bitboard pinners(Color c) const { return st->pinners[c]; }
 
-#if !STOCKFISH
 	// c側の玉に対して、指し手mが空き王手となるのか。
 	bool is_discovery_check_on_king(Color c, Move m) const { return st->blockersForKing[c] & m.from_sq(); }
 
@@ -494,7 +442,6 @@ public:
 	// 📝 StockfishのBitboardはuint64_tだが、将棋では128bit構造体なので
 	//     boolへの変換を暗黙でやりたくない。
     bool in_check() const { return checkers(); }
-#endif
 
     // -----------------------
     // Attacks to/from a given square
@@ -508,11 +455,6 @@ public:
 	Bitboard attackers_to(Square sq) const { return attackers_to(sq, pieces()); }
     Bitboard attackers_to(Square sq, const Bitboard& occ) const;
 
-#if STOCKFISH
-    // これはcastlingの判定のためのもの。将棋では使わない。
-    bool attackers_to_exist(Square s, Bitboard occupied, Color c) const;
-
-#else
 
 	Bitboard attackers_to(Color c, Square sq) const {
         return c == BLACK ? attackers_to<BLACK>(sq, pieces()) : attackers_to<WHITE>(sq, pieces());
@@ -539,7 +481,6 @@ public:
         return attackers_to(c, sq, pieces() ^ kingSq);
     }
 
-#endif
 
 	// update_slider_blockers() calculates st->blockersForKing[c] and st->pinners[~c],
     // which store respectively the pieces preventing king of color c from being in check
@@ -575,12 +516,8 @@ public:
 			渡すようになったが、やねうら王では、このclassをPosition classと癒着したくない。
 			そこで、第四引数をtemplate T*にするが、ここに何も指定しないということもできてほしい。
 	*/
-#if STOCKFISH
-    void do_move(Move m, StateInfo& newSt, bool givesCheck, const TranspositionTable* tt);
-#else
 	template <typename T = void>
     void do_move(Move m, StateInfo& newSt, bool givesCheck, const T* tt = nullptr);
-#endif
 
 	// 💡 上記のdo_move()にはgivesCheckも渡さないといけないが、
 	//     mで王手になるかどうかがわからないときはこちらの関数を用いる。
@@ -684,13 +621,11 @@ public:
     Key minor_piece_key() const;
     Key non_pawn_key(Color c) const;
 
-#if !STOCKFISH
 	// ある指し手を指した後のhash keyを返す。
 	// 将棋だとこの計算にそこそこ時間がかかるので、通常の探索部でprefetch用に
 	// これを計算するのはあまり得策ではないが、詰将棋ルーチンでは置換表を投機的に
 	// prefetchできるとずいぶん速くなるのでこの関数を用意しておく。
 	Key key_after(Move m) const;
-#endif
 
     // -----------------------
     // Other properties of the position
@@ -704,15 +639,6 @@ public:
     // 平手の開始局面なら1が返る。(0ではない)
     int game_ply() const;
 
-#if STOCKFISH
-    bool is_chess960() const;
-    bool is_draw(int ply) const;
-    bool is_repetition(int ply) const;
-    bool upcoming_repetition(int ply) const;
-    bool has_repeated() const;
-    int  rule50_count() const;
-
-#else
 
     // 普通の千日手、連続王手の千日手等を判定する。
     // そこまでの局面と同一局面であるかを、局面を遡って調べる。
@@ -734,13 +660,7 @@ public:
     // of positions since the last capture or pawn move.
     bool has_repeated() const;
 #endif
-#endif
 
-#if STOCKFISH
-	// 歩以外の駒の駒割。やねうら王では使わない。
-    Value non_pawn_material(Color c) const;
-    Value non_pawn_material() const;
-#endif
 
     // Position consistency check, for debugging
 	// デバッグのために局面の一貫性のチェック
@@ -778,7 +698,6 @@ public:
     // 駒を盤面から取り除き、内部的に保持しているBitboardも更新する。
     void remove_piece(Square sq);
 
-#if !STOCKFISH
 	// put_pieceの手駒版
     /*
 		📓 pieceCountについて。
@@ -800,7 +719,6 @@ public:
     // put_piece(),remove_piece()では玉の位置(kingSquare[])を
     // 更新してくれないので、自前で更新するか、一連の処理のあとにこの関数を呼び出す必要がある。
     void update_kingSquare();
-#endif
 
 	// --- misc
 
@@ -938,16 +856,10 @@ private:
     // Initialization helpers (used while setting up a position)
 	 // 初期化用のヘルパー（局面を設定する際に使用）
 
-#if STOCKFISH
-	void set_castling_right(Color c, Square rfrom);
-#endif
 
 	// StateInfoの初期化。Position::set()のタイミングで行われる。
 	void set_state() const;
 
-#if STOCKFISH
-    void set_check_info() const;
-#else
 	// 王手になるbitboard等を更新する。set_state()とdo_move()から呼び出される。
 	// 🌈 null moveのときは利きの更新を少し端折れるのでフラグを渡すことにした。
 	template <bool doNullMove,Color Us>
@@ -958,21 +870,7 @@ private:
 	{
 		sideToMove == BLACK ? set_check_info<doNullMove, BLACK>() : set_check_info<doNullMove, WHITE>();
 	}
-#endif
 
-#if STOCKFISH
-	// Other helpers
-    void move_piece(Square from, Square to);
-    template<bool Do>
-    void do_castling(Color             us,
-                     Square            from,
-                     Square&           to,
-                     Square&           rfrom,
-                     Square&           rto,
-                     DirtyPiece* const dp = nullptr);
-    Key  adjust_key50(Key k) const;
-
-#endif
 
 	// do_move()の先後分けたもの。内部的に呼び出される。
     template<Color Us, typename T>
@@ -1027,16 +925,6 @@ private:
     // 盤上の先手/後手/両方の駒があるところが1であるBitboard
     std::array<Bitboard, COLOR_NB>    byColorBB;
 
-#if STOCKFISH
-    // 各駒の数
-	// 💡 手駒も含む。後手の手駒は、後手のPieceとみなしてカウントする。
-    int pieceCount[PIECE_NB];
-	// ⇨  やねうら王では使わないことにした。
-
-    int      castlingRightsMask[SQUARE_NB];
-    Square   castlingRookSquare[CASTLING_RIGHT_NB];
-    Bitboard castlingPath[CASTLING_RIGHT_NB];
-#endif
 
 	// 現局面に対応するStateInfoのポインタ。
     // do_move()で次の局面に進むときは次の局面のStateInfoへの参照をdo_move()の引数として渡される。
@@ -1050,9 +938,6 @@ private:
     // 手番
     Color sideToMove;
 
-#if STOCKFISH
-    bool chess960;
-#else
     // 手駒
     Hand hand[COLOR_NB];
 
@@ -1065,7 +950,6 @@ private:
     // 評価関数で用いる駒のリスト
     Eval::EvalList evalList;
 
-#endif
 };
 
 
@@ -1084,15 +968,11 @@ inline const std::array<Piece, SQ_NB_PLUS1>& Position::piece_array() const { ret
 inline bool Position::empty(Square s) const { return piece_on(s) == NO_PIECE; }
 
 inline Piece Position::moved_piece(Move m) const {
-#if STOCKFISH
-    return piece_on(m.from_sq());
-#else
     // 📝 Stockfishでは移動させた駒(moved_piece_before())を期待しているが、
     //     moved_piece_after()にしたほうが強いっぽいので、やねうら王では
     //     moved_piece()は、moved_piece_after()のaliasとする。
 
 	return moved_piece_after(m);
-#endif
 }
 
 inline Bitboard Position::pieces() const { return byTypeBB[ALL_PIECES]; }
@@ -1110,23 +990,6 @@ inline Bitboard Position::pieces(Color c, PieceTypes... pts) const {
     return pieces(c) & pieces(pts...);
 }
 
-#if STOCKFISH
-template<PieceType Pt>
-inline int Position::count(Color c) const {
-    return pieceCount[make_piece(c, Pt)];
-}
-
-template<PieceType Pt>
-inline int Position::count() const {
-    return count<Pt>(WHITE) + count<Pt>(BLACK);
-}
-
-template<PieceType Pt>
-inline Square Position::square(Color c) const {
-    assert(count<Pt>(c) == 1);
-    return lsb(pieces(c, Pt));
-}
-#else
 template<PieceType Pt>
 inline Square Position::square(Color c) const {
     // やねうら王ではPt == KINGしか許容しない。
@@ -1135,36 +998,12 @@ inline Square Position::square(Color c) const {
     // 📝 やねうら王では、lsb()が重いのでこれを使わない実装を考える。
     return kingSquare[c];
 }
-#endif
 
-#if STOCKFISH
-inline Square Position::ep_square() const { return st->epSquare; }
-
-inline bool Position::can_castle(CastlingRights cr) const { return st->castlingRights & cr; }
-
-inline bool Position::castling_impeded(CastlingRights cr) const {
-    assert(cr == WHITE_OO || cr == WHITE_OOO || cr == BLACK_OO || cr == BLACK_OOO);
-    return pieces() & castlingPath[cr];
-}
-
-inline Square Position::castling_rook_square(CastlingRights cr) const {
-    assert(cr == WHITE_OO || cr == WHITE_OOO || cr == BLACK_OO || cr == BLACK_OOO);
-    return castlingRookSquare[cr];
-}
-#endif
 
 // 🚧
 
 
-#if STOCKFISH
-inline Key Position::key() const { return adjust_key50(st->key); }
-
-inline Key Position::adjust_key50(Key k) const {
-    return st->rule50 < 14 ? k : k ^ make_key((st->rule50 - 14) / 8);
-}
-#else
 inline Key Position::key() const { return st->key(); }
-#endif
 
 inline Key Position::pawn_key() const { return st->pawnKey; }
 
@@ -1174,31 +1013,13 @@ inline Key Position::minor_piece_key() const { return st->minorPieceKey; }
 
 inline Key Position::non_pawn_key(Color c) const { return st->nonPawnKey[c]; }
 
-#if STOCKFISH
-inline Value Position::non_pawn_material(Color c) const { return st->nonPawnMaterial[c]; }
-
-inline Value Position::non_pawn_material() const {
-    return non_pawn_material(WHITE) + non_pawn_material(BLACK);
-}
-#endif
 
 inline int Position::game_ply() const { return gamePly; }
 
-#if STOCKFISH
-inline int Position::rule50_count() const { return st->rule50; }
-
-inline bool Position::is_chess960() const { return chess960; }
-
-inline bool Position::capture(Move m) const {
-    assert(m.is_ok());
-    return (!empty(m.to_sq()) && m.type_of() != CASTLING) || m.type_of() == EN_PASSANT;
-}
-#else
 inline bool Position::capture(Move m) const {
     ASSERT_LV3(m.is_ok());
     return !m.is_drop() && piece_on(m.to_sq()) != NO_PIECE;
 }
-#endif
 
 
 // returns true if a move is generated from the capture stage
@@ -1212,10 +1033,6 @@ inline bool Position::capture(Move m) const {
 
 inline bool Position::capture_stage(Move m) const
 {
-#if STOCKFISH
-    assert(is_ok(m));
-    return  capture(m) || promotion_type(m) == QUEEN;
-#else
 
     // 📊　V7.73y3とy4,y5の比較。
     //      return capture_or_valuable_promotion(m);
@@ -1223,7 +1040,6 @@ inline bool Position::capture_stage(Move m) const
     //      よりは、単にcapture()にするのが良かった。
 
     return capture(m);
-#endif
 }
 
 // 駒を配置して、内部的に保持しているBitboard、pieceCountも更新する。
@@ -1239,11 +1055,6 @@ inline void Position::put_piece(Piece pc, Square s) {
 	// 先手・後手の駒のある場所を示すoccupied bitboardの更新
     byColorBB[color_of(pc)] |= s;
 
-#if STOCKFISH
-	// 駒のカウント
-    pieceCount[pc]++;
-    pieceCount[make_piece(color_of(pc), ALL_PIECES)]++;
-#endif
 }
 
 // 駒を盤面から取り除き、内部的に保持しているBitboardも更新する。
@@ -1254,13 +1065,8 @@ inline void Position::remove_piece(Square s) {
     byTypeBB[type_of(pc)] ^= s;
     byColorBB[color_of(pc)] ^= s;
     board[s] = NO_PIECE;
-#if STOCKFISH
-    pieceCount[pc]--;
-    pieceCount[make_piece(color_of(pc), ALL_PIECES)]--;
-#endif
 }
 
-#if !STOCKFISH
 
 // put_pieceの手駒版
 inline void Position::put_hand_piece(Color c, PieceType pr)
@@ -1279,7 +1085,6 @@ inline void Position::remove_hand_piece(Color c, PieceType pr)
 }
 
 inline bool is_ok(Position& pos) { return pos.pos_is_ok(); }
-#endif
 
 // 🚧
 

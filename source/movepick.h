@@ -54,9 +54,7 @@ class MovePicker {
                const PieceToHistory**       ch,
                const SharedHistories*       sh,
                int ply_
-#if !STOCKFISH
               ,bool generate_all_legal_moves
-#endif
     );
 
     // 通常探索時にProbCutの処理から呼び出されるのコンストラクタ。
@@ -64,10 +62,7 @@ class MovePicker {
     // threshold_ = 直前に取られた駒の価値。これ以下の捕獲の指し手は生成しない。
     // capture_or_pawn_promotion()に該当する指し手しか返さない。
     MovePicker(const Position&, Move ttMove_, int threshold_, const CapturePieceToHistory*
-#if STOCKFISH
-#else
     , bool generate_all_legal_moves
-#endif
     );
 
     // 呼び出されるごとに新しいpseudo legalな指し手をひとつ返す。
@@ -133,12 +128,9 @@ class MovePicker {
     // cf. https://www.nara-wu.ac.jp/math/personal/shinoda/bunki.html
     ExtMove moves[MAX_MOVES];
 
-#if STOCKFISH
-#else
     // Position::pseudo_legal()に渡す第2パラメーター。
     // 📝 やねうら王では、MovePickerのコンストラクタでもらう。
     bool generate_all_legal_moves;
-#endif
 };
 
 }  // namespace YaneuraOu

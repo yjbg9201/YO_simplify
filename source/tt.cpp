@@ -106,12 +106,8 @@ struct TTEntry {
 	// このEntryが使われているか？
 	bool is_occupied() const { return bool(depth8); };
 
-#if STOCKFISH
-    void save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8);
-#else
     void
     save(TTE_KEY_TYPE k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8);
-#endif
 
 	uint8_t relative_age(const uint8_t curr_generation) const;
 
@@ -192,12 +188,6 @@ uint8_t TTEntry::relative_age(const uint8_t curr_generation) const {
 TTWriter::TTWriter(TTEntry* tte) :
 	entry(tte) {}
 
-#if STOCKFISH
-void TTWriter::write(
-  Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8) {
-    entry->save(k, v, pv, b, d, m, ev, generation8);
-}
-#else
 
 void TTWriter::write(
   const Key k_, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8) {
@@ -210,7 +200,6 @@ void TTWriter::write(
 
     entry->save(k, v, pv, b, d, m, ev, generation8);
 }
-#endif
 
 
 // A TranspositionTable is an array of Cluster, of size clusterCount. Each cluster consists of ClusterSize number
@@ -257,12 +246,6 @@ static_assert((sizeof(Cluster) % 32) == 0, "Unexpected Cluster size");
 // 各クラスターはClusterSize個のTTEntryで構成されます。
 
 void TranspositionTable::resize(size_t mbSize, ThreadPool& threads) {
-#if STOCKFISH
-    aligned_large_pages_free(table);
-
-    clusterCount = mbSize * 1024 * 1024 / sizeof(Cluster);
-
-#else
 
 	// mbSizeの単位は[MB]なので、ここでは1MBの倍数単位のメモリが確保されるが、
 	// 仕様上は、1MBの倍数である必要はない。
@@ -285,7 +268,6 @@ void TranspositionTable::resize(size_t mbSize, ThreadPool& threads) {
 	aligned_large_pages_free(table);
 
 	clusterCount = newClusterCount;
-#endif
 
 	// tableはCacheLineSizeでalignされたメモリに配置したいので、CacheLineSize-1だけ余分に確保する。
 	// callocではなくmallocにしないと初回の探索でTTにアクセスするとき、特に巨大なTTだと
@@ -302,12 +284,6 @@ void TranspositionTable::resize(size_t mbSize, ThreadPool& threads) {
 		exit(EXIT_FAILURE);
 	}
 
-#if STOCKFISH
-	clear(threads);
-
-	// →　Stockfish、ここでclear()呼び出しているが、Search::clear()からTT.clear()を呼び出すので
-	// 二重に初期化していることになると思う。
-#endif
 }
 
 // Initializes the entire transposition table to zero,
@@ -446,16 +422,6 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key, cons
 
 TTEntry* TranspositionTable::first_entry(const Key& key_, Color side_to_move) const {
 
-#if STOCKFISH
-
-    return &table[mul_hi64(key, clusterCount)].entry[0];
-	// 💡 mul_hi64は、64bit * 64bitの掛け算をして下位64bitを取得する関数。
-
-	// key(64bit) × clusterCount / 2^64 の値は 0 ～ clusterCount - 1 である。
-    // 掛け算が必要にはなるが、こうすることで custerCountを2^Nで確保しないといけないという制約が外れる。
-    // cf. Allow for general transposition table sizes. : https://github.com/official-stockfish/Stockfish/commit/2198cd0524574f0d9df8c0ec9aaf14ad8c94402b
-
-#else
 
 	// ⚠ Key128, Key256ならば、これで key_.extract64<0>() の意味になる。
 	const Key64 key = Key64(key_);
@@ -478,7 +444,6 @@ TTEntry* TranspositionTable::first_entry(const Key& key_, Color side_to_move) co
 	// ⚠ Colorの実体はuint8で、0,1の値しか取らないものとする。
 	return &table[(index & ~1) | side_to_move].entry[0];
 
-#endif
 }
 
 } // namespace YaneuraOu

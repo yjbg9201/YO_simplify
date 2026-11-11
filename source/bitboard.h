@@ -1107,11 +1107,7 @@ inline Bitboard attacks_bb(Square s, Bitboard occupied) {
 // Returns the least significant bit in a non-zero bitboard.
 // 0でないビットボードにおける最下位ビットを返す。
 // 📝 Stockfishとの互換性のために用意
-#if STOCKFISH
-inline Square lsb(Bitboard b) {
-#else
 inline int8_t lsb(uint64_t b) {
-#endif
 	assert(b);
 
 #if defined(__GNUC__)  // GCC, Clang, ICX
@@ -1147,11 +1143,7 @@ inline int8_t lsb(uint64_t b) {
 // Returns the most significant bit in a non-zero bitboard.
 // 0でないビットボードにおける最上位ビットを返す。
 // 📝 Stockfishとの互換性のために用意
-#if STOCKFISH
-inline Square msb(Bitboard b) {
-#else
 inline int8_t msb(uint64_t b) {
-#endif
     assert(b);
 
 #if defined(__GNUC__)  // GCC, Clang, ICX

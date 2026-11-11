@@ -190,18 +190,10 @@ public:
 
 std::string engine_version_info() {
 	std::stringstream ss;
-#if STOCKFISH
-	ss << "Stockfish " << version << std::setfill('0');
-#else
     ss << "YaneuraOu" << ENGINE_VERSION;
-#endif
 
 	// "dev"版であれば日付を出力する機能。
-#if STOCKFISH
-	if constexpr (version == "dev")
-#else
     if (StringExtension::Contains(ENGINE_VERSION, "dev"))
-#endif
 	{
 		ss << "-";
 #ifdef GIT_DATE
@@ -234,10 +226,6 @@ std::string engine_info(const std::string& engine_name,
 						const std::string& engine_version,
                         const std::string& eval_name)
 {
-#if STOCKFISH
-    return engine_version_info() + (to_uci ? "\nid author " : " by ")
-         + "the Stockfish developers (see AUTHORS file)";
-#endif
     // → これ好きじゃない。
 
 	stringstream ss;
@@ -389,10 +377,6 @@ string compiler_info() {
 	compiler += " NEON";
 #endif
 
-#if STOCKFISH
-	compiler += (HasPopCnt ? " POPCNT" : "");
-	// ⇨ このフラグ、やねうら王では持っていない。
-#endif
 
 #if !defined(NDEBUG)
 	compiler += " DEBUG";

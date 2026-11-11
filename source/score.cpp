@@ -28,7 +28,6 @@ Score::Score(Value v /*, const Position& pos*/) {
     }
 }
 
-#if !STOCKFISH
 // 🌈 Valueの値を(cpへの変換をせずに)そのままScoreに変換する。
 Score Score::from_internal_value(Value v) {
     Score score;
@@ -46,6 +45,5 @@ Value Score::to_value() const {
     int plies = get<Mate>().plies;
     return (plies > 0) ? mate_in(plies) : mated_in(plies);
 }
-#endif
 
 }

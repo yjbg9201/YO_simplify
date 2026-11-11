@@ -41,17 +41,12 @@ Engine::Engine() :
 
 void Engine::usi()
 {
-#if STOCKFISH
-    sync_cout << "id name " << engine_info(true) << "\n" << engine.get_options() << sync_endl;
-    sync_cout << "uciok" << sync_endl;
-#else
     sync_cout << "id name "
               << engine_info(get_engine_name(), get_engine_author(), get_engine_version(),
                              get_eval_name())
               << get_options() << sync_endl;
 
     sync_cout << "usiok" << sync_endl;
-#endif
 }
 
 // どのエンジンでも共通で必要なエンジンオプションを生やす。
@@ -136,14 +131,6 @@ void Engine::add_options() {
     // 基本オプションを生やす。
     add_base_options();
 
-#if STOCKFISH
-    // Stockfishには、探索部を初期化するエンジンオプションがあるが使わないので未サポートとする。
-    options.add(  //
-      "Clear Hash", Option([this](const Option&) {
-          search_clear();
-          return std::nullopt;
-      }));
-#endif
 
     // このタイミングで"Threads"の設定を仮に反映させる。
     // 📝 Threadsを1以上にしておかないと、このあと置換表のクリアなど、
@@ -186,12 +173,10 @@ void Engine::set_numa_config_from_option(const std::string& o) {
 // blocking call to wait for search to finish
 // 探索が完了のを待機する。(完了したらリターンする)
 void Engine::wait_for_search_finished() {
-#if !STOCKFISH
 	// やねうら王では、まだスレッド初期化が終わっていない可能性がある。
 	// スレッドが生成されていないとmain_thread()がないので、この場合、無視する。
     if (!threads.size())
         return;
-#endif
 
 	threads.main_thread()->wait_for_search_finished();
 }
@@ -209,9 +194,7 @@ std::optional<PositionSetError> Engine::set_position(const std::string&         
 	if (err.has_value())
 		return err;
 
-#if !STOCKFISH
     std::vector<Move> moves0;
-#endif
 
 	for (const auto& move : moves)
 	{
@@ -226,16 +209,12 @@ std::optional<PositionSetError> Engine::set_position(const std::string&         
 		else
 			pos.do_move(m, states->back());
 
-#if !STOCKFISH
 		moves0.emplace_back(m);
-#endif
 	}
 
-#if !STOCKFISH
 	// 🌈 やねうら王では、ここに保存しておくことになっている。
     game_root_sfen = sfen;
 	moves_from_game_root = std::move(moves0);
-#endif
 
 	return std::nullopt;
 }
@@ -280,19 +259,9 @@ void Engine::go(Search::LimitsType& limits) {
 void Engine::stop() { threads.stop = true; }
 
 void Engine::search_clear() {
-#if STOCKFISH
-    wait_for_search_finished();
-
-    tt.clear(threads);
-    threads.clear();
-
-    // @TODO wont work with multiple instances
-    Tablebases::init(options["SyzygyPath"]);  // Free mapped files
-#else
 	// benchコマンドから内部的に呼び出す。
     wait_for_search_finished();
     isready();
-#endif
 }
 
 void Engine::set_on_update_no_moves(std::function<void(const Engine::InfoShort&)>&& f) {
@@ -316,7 +285,6 @@ void Engine::set_on_verify_networks(std::function<void(std::string_view)>&& f) {
 	// TODO : あとで
 }
 
-#if !STOCKFISH
 void Engine::set_on_update_string(std::function<void(std::string_view)>&& f) {
     updateContext.onUpdateString = std::move(f);
 }
@@ -324,7 +292,6 @@ void Engine::set_on_update_string(std::function<void(std::string_view)>&& f) {
 std::function<void(std::string_view, std::string_view)> Engine::get_on_bestmove() {
     return updateContext.onBestmove;
 }
-#endif
 
 void Engine::resize_threads() {
 
@@ -333,9 +300,6 @@ void Engine::resize_threads() {
 
 	// 📌 スレッド数のリサイズ
 
-#if STOCKFISH
-	threads.set(numaContext.get_numa_config(), { options, threads, tt, networks }, updateContext);
-#else
 
 	// 🌈  やねうら王ではここでWorkerFactoryを渡すように変更。
 	//    これにより、生成Worker(Worker派生class)をEngine派生classで選択できる。
@@ -353,16 +317,9 @@ void Engine::resize_threads() {
 				updateContext,
                 options["Threads"],
 				worker_factory);
-#endif
 
 	// 📌 置換表の再割り当て。
 
-#if STOCKFISH
-	// Reallocate the hash with the new threadpool size
-	// 新しいスレッドプールのサイズに合わせてハッシュを再割り当てする
-	set_tt_size(options["Hash"]);
-	//  ⇨  EngineがTTを持っているとは限らないので、やねうら王ではこの部分を分離したい。
-#endif
 
 	// 📌 NUMAの設定
 
@@ -371,17 +328,10 @@ void Engine::resize_threads() {
 }
 
 void Engine::set_tt_size(size_t mb) {
-#if STOCKFISH
-	wait_for_search_finished();
-    tt.resize(mb, threads);
-#endif
     // 🌈 やねうら王ではEngine classはTTを持たない。派生class側で処理する。
 }
 
 void Engine::set_ponderhit(bool b) {
-#if STOCKFISH
-	threads.main_manager()->ponder = b;
-#endif
     // 🌈 やねうら王ではThreadPool classはmain_managerを持たない。Engine派生class側で処理する。
 }
 
@@ -395,30 +345,15 @@ void Engine::set_ponderhit(bool b) {
 
 void Engine::trace_eval() const {
 	// 🌈 やねうら王では、Engine派生classで定義する。
-#if STOCKFISH
-	StateListPtr trace_states(new std::deque<StateInfo>(1));
-    Position     p;
-
-	p.set(pos.fen(), options["UCI_Chess960"], &trace_states->back());
-
-    verify_networks();
-	sync_cout << "\n" << Eval::trace(p, *networks) << sync_endl;
-#endif
 }
 
-#if !STOCKFISH
 Value Engine::evaluate() const { return VALUE_NONE; }
-#endif
 
 const OptionsMap& Engine::get_options() const { return options; }
 OptionsMap&       Engine::get_options() { return options; }
 
 // 現在の局面のsfen形式の表現を取得する。
-#if STOCKFISH
-std::string Engine::fen() const { return pos.fen(); }
-#else
 std::string Engine::sfen() const { return pos.sfen(); }
-#endif
 
 // 盤面を180°回転させる。
 void Engine::flip() { pos.flip(); }
@@ -430,11 +365,7 @@ std::string Engine::visualize() const {
     return ss.str();
 }
 
-#if STOCKFISH
-int Engine::get_hashfull(int maxAge) const { return tt.hashfull(maxAge); }
-#else
 int Engine::get_hashfull(int maxAge) const { return 0; }
-#endif
 
 std::vector<std::pair<size_t, size_t>> Engine::get_bound_thread_count_by_numa_node() const {
 	auto                                   counts = threads.get_bound_thread_count_by_numa_node();

@@ -174,9 +174,7 @@ class SharedMemory: public detail::SharedMemoryBase {
     size_t             total_size_ = 0;
     std::string        sentinel_base_;
     std::string        sentinel_path_;
-#if !STOCKFISH
     bool               reused_existing_ = false;
-#endif
 
     static constexpr size_t calculate_total_size() noexcept {
         return sizeof(T) + sizeof(detail::ShmHeader);
@@ -213,10 +211,8 @@ class SharedMemory: public detail::SharedMemoryBase {
         total_size_(other.total_size_),
         sentinel_base_(std::move(other.sentinel_base_)),
         sentinel_path_(std::move(other.sentinel_path_))
-#if !STOCKFISH
         ,
         reused_existing_(other.reused_existing_)
-#endif
     {
 
         detail::SharedMemoryRegistry::unregister_instance(&other);
@@ -238,9 +234,7 @@ class SharedMemory: public detail::SharedMemoryBase {
             total_size_    = other.total_size_;
             sentinel_base_ = std::move(other.sentinel_base_);
             sentinel_path_ = std::move(other.sentinel_path_);
-#if !STOCKFISH
             reused_existing_ = other.reused_existing_;
-#endif
 
             detail::SharedMemoryRegistry::unregister_instance(&other);
             detail::SharedMemoryRegistry::register_instance(this);
@@ -336,9 +330,7 @@ class SharedMemory: public detail::SharedMemoryBase {
             unlock_shared_mutex();
             unlock_file();
             detail::SharedMemoryRegistry::register_instance(this);
-#if !STOCKFISH
             reused_existing_ = !created_new;
-#endif
             return true;
         }
     }
@@ -401,9 +393,7 @@ class SharedMemory: public detail::SharedMemoryBase {
 
     [[nodiscard]] const T& operator*() const noexcept { return *data_ptr_; }
 
-#if !STOCKFISH
     [[nodiscard]] bool reused_existing() const noexcept { return is_open() && reused_existing_; }
-#endif
 
     [[nodiscard]] uint32_t ref_count() const noexcept {
         return header_ptr_ ? header_ptr_->ref_count.load(std::memory_order_acquire) : 0;
@@ -422,9 +412,7 @@ class SharedMemory: public detail::SharedMemoryBase {
         data_ptr_   = nullptr;
         header_ptr_ = nullptr;
         sentinel_path_.clear();
-#if !STOCKFISH
         reused_existing_ = false;
-#endif
     }
 
     void unmap_region() noexcept {

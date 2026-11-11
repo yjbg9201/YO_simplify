@@ -92,12 +92,8 @@ public:
 	// numaTotal     : NUMA内は何個のthreadがあるか。
 	Thread(
 		Search::SharedState&,
-#if STOCKFISH
-		std::unique_ptr<Search::ISearchManager>,
-#else
 		// 📌 やねうら王では、ISearchManagerを使わずに、Workerのfactoryを使ってWorkerを直接生成する。
 		Search::WorkerFactory          factory,
-#endif
 		size_t                         threadIdx,
 		size_t						   numaThreadIdx,
 		size_t						   numaTotal,
@@ -254,11 +250,7 @@ public:
        ⚠ このmethodはEngine::resize_threads()からのみ呼び出される。
     */
 
-#if STOCKFISH
-	Search::SearchManager* main_manager();
-#else
 	// 📝 やねうら王では、SearchManagerはEngine派生classが持つように変更した。
-#endif
 
 	// mainスレッドを取得する。これはthis[0]がそう。
     Thread* main_thread() const { return threads.front().get(); }
@@ -269,14 +261,6 @@ public:
     // 　dlshogi::nodes_visited()を呼び出すこと。
     uint64_t nodes_searched() const;
 
-#if STOCKFISH
-	// 💡 tablebaseにhitした回数。将棋では使わない。
-	uint64_t               tb_hits() const;
-
-	// ⚠ これは、やねうら王の標準探索エンジンでしか使わないので、
-    //     YaneuraOuEngine側に移動させる。
-	Thread*  get_best_thread() const;
-#endif
 
 	// メイン以外のすべてのスレッドのstart_searching()を呼び出す。(並列探索の開始)
     // 💡 このmethodはmainスレッドで呼び出す。
@@ -299,9 +283,6 @@ public:
 	//                 🤔 このフラグはSearchManagerに移動
 
 	std::atomic_bool stop, abortedSearch
-#if STOCKFISH
-		, increaseDepth
-#endif
 		;
 
 	auto cbegin() const noexcept { return threads.cbegin(); }

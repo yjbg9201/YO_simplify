@@ -38,22 +38,12 @@ class Option {
     Option(const char* v, OnChange = nullptr);
 
     // integer
-#if STOCKFISH
-	Option(int v, int minv, int maxv, OnChange = nullptr);
-#else
 	// ⇨ 💡 やねうら王では、引数をint64_tに変更
     Option(int64_t v, int64_t minv, int64_t maxv, OnChange = nullptr);
-#endif
 
     // combo
-#if STOCKFISH
-    // 📌 Option("B var A var B var C","B")のような形式。
-    //     これは使いづらい。やねうら王では使わない。
-    Option(const char* v, const char* cur, OnChange = nullptr);
-#else
 	// 📌 Option(vector{"A","B","C"},"B")のような形式。
     Option(const std::vector<std::string>& list, const std::string& cur, OnChange = nullptr);
-#endif
 
     Option& operator=(const std::string&);
 
@@ -142,7 +132,6 @@ class OptionsMap {
     // 💡 ある名前のoption項目を持っているかどうかを調べるのに使う。
     std::size_t count(const std::string& option_name) const;
 
-#if !STOCKFISH
 
     // 📌 やねうら王独自拡張 📌
 
@@ -180,7 +169,6 @@ class OptionsMap {
     // ⚠ 値が存在しないidxを指定すると落ちる。
     std::pair<const std::string, const Option&> get_option_by_idx(size_t idx) const;
 
-#endif
 
    private:
     friend class Engine;
@@ -202,7 +190,6 @@ class OptionsMap {
     // 指定がなければ従来互換のV1。
     int book_options_version = 1;
 
-#if !STOCKFISH
     // 思考エンジンがGUIからの"usi"に対して返す"option ..."文字列から
     // Optionオブジェクトを構築して、それを *this に突っ込む。
     // "engine_options.txt"というファイルの各行からOptionオブジェクト構築して
@@ -211,7 +198,6 @@ class OptionsMap {
     // のような文字列が引数として渡される。
     // このとき、Optionのhandlerとidxは書き換えない。
     void build_option(const std::string& line);
-#endif
 };
 
 // OptionsMapを参照で使いたい時に使うproxy。(やねうら王独自拡張)

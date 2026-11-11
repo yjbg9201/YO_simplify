@@ -41,31 +41,19 @@ uint64_t perft(Position& pos, Depth depth) {
             pos.undo_move(m);
         }
         if (Root)
-#if STOCKFISH
-            sync_cout << USIEngine::move(m, pos.is_chess960() ) << ": " << cnt << sync_endl;
-#else
             sync_cout << USIEngine::move(m /*, pos.is_chess960() */) << ": " << cnt << sync_endl;
-#endif
     }
     return nodes;
 }
 
-#if STOCKFISH
-inline uint64_t perft(const std::string& fen, Depth depth , bool isChess960) {
-#else
 inline uint64_t perft(const std::string& fen, Depth depth /*, bool isChess960 */) {
 
 	ElapsedTimer time;
     time.reset();
-#endif
 
 	Position  p;
     StateInfo st;
 
-#if STOCKFISH
-    p.set(fen, isChess960, &st);
-    return perft<true>(p, depth);
-#else
     p.set(fen, &st);
 
 	// 🌈 やねうら王では、NPS(leaf nodeの数/elapsed)と計測に要した時間も出力する。
@@ -76,7 +64,6 @@ inline uint64_t perft(const std::string& fen, Depth depth /*, bool isChess960 */
     sync_cout << 1000 * nodes / elapsed << " NPS" << sync_endl;
 
 	return nodes;
-#endif
 
 }
 }

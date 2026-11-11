@@ -71,14 +71,6 @@ std::vector<std::string> setup_bench(const std::string& currentFen, std::istream
 	std::vector<std::string> fens, list;
 	std::string              go, token;
 
-#if STOCKFISH
-	// Assign default values to missing arguments
-	std::string ttSize    = (is >> token) ? token : "16";
-	std::string threads   = (is >> token) ? token : "1";
-	std::string limit     = (is >> token) ? token : "13";
-	std::string fenFile   = (is >> token) ? token : "default";
-	std::string limitType = (is >> token) ? token : "depth";
-#else
 	// 🌈 やねうら王では、デフォルトで1分間(時間固定)のbenchにしておく。
 
 	std::string ttSize    = (is >> token) ? token : "1024";
@@ -86,7 +78,6 @@ std::vector<std::string> setup_bench(const std::string& currentFen, std::istream
     std::string limit     = (is >> token) ? token : "15000";
     std::string fenFile   = (is >> token) ? token : "default";
     std::string limitType = (is >> token) ? token : "movetime";
-#endif
 
 	go = limitType == "eval" ? "eval" : "go " + limitType + " " + limit;
 
@@ -115,11 +106,7 @@ std::vector<std::string> setup_bench(const std::string& currentFen, std::istream
 	}
 
 	list.emplace_back("setoption name Threads value " + threads);
-#if STOCKFISH
-	list.emplace_back("setoption name Hash value " + ttSize);
-#else
     list.emplace_back("setoption name USI_Hash value " + ttSize);
-#endif
 	// 🤔 どうせ内部的にしか使わない符号みたいなものなので"usinewgame"に変更しないことにする。
     list.emplace_back("ucinewgame");
 
@@ -128,11 +115,7 @@ std::vector<std::string> setup_bench(const std::string& currentFen, std::istream
 			list.emplace_back(fen);
 		else
 		{
-#if STOCKFISH
-			list.emplace_back("position fen " + fen);
-#else
             list.emplace_back("position sfen " + fen);
-#endif
 			list.emplace_back(go);
 		}
 
@@ -203,11 +186,7 @@ BenchmarkSetup setup_benchmark(std::istream& is) {
 		int ply = 1;
 		for (const std::string& fen : game)
 		{
-#if STOCKFISH
-			setup.commands.emplace_back("position fen " + fen);
-#else
             setup.commands.emplace_back("position sfen " + fen);
-#endif
 			const int correctedTime = static_cast<int>(getCorrectedTime(ply) * timeScaleFactor);
 			setup.commands.emplace_back("go movetime " + std::to_string(correctedTime));
 

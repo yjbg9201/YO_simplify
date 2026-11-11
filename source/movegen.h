@@ -12,17 +12,6 @@
 
 namespace YaneuraOu {
 
-#if STOCKFISH
-
-enum GenType {
-    CAPTURES,
-    QUIETS,
-    EVASIONS,
-    NON_EVASIONS,
-    LEGAL
-};
-
-#else
 
 // 生成する指し手の種類
 enum GenType {
@@ -83,7 +72,6 @@ enum GenType {
     RECAPTURES,      // 指定升への移動の指し手のみを生成する。(歩の不成などは含まない)
     RECAPTURES_ALL,  // 指定升への移動の指し手のみを生成する。(歩の不成なども含む)
 };
-#endif
 
 class Position;
 
@@ -99,13 +87,9 @@ struct ExtMove: public Move {
 
 	int value;  // 指し手オーダリング(並び替え)のときのスコア(符号つき32bit)
 
-#if STOCKFISH
-    void operator=(Move m) { data = m.raw(); }
-#else
     // Move型から暗黙で代入できる。
     // 💡 こうしておけば、MoveList* curに対して *cur++ = move; のように書ける。
     void operator=(const Move m) { data = m.to_u32(); }
-#endif
 
 	// 補足 : このクラスの変数をMove型にしたいときは、このクラスの変数を Move(m) のようにすれば良い。
 
@@ -129,9 +113,7 @@ inline bool operator<(const ExtMove& f, const ExtMove& s) { return f.value < s.v
 template<GenType>
 Move* generate(const Position& pos, Move* moveList);
 
-#if !STOCKFISH
 std::ostream& operator<<(std::ostream& os, ExtMove m);
-#endif
 
 // The MoveList struct wraps the generate() function and returns a convenient
 // list of moves. Using MoveList is sometimes preferable to directly calling
@@ -172,14 +154,12 @@ struct MoveList {
     // ⚠ ASSERTなどで用いる。遅いので通常探索等では用いないこと。
     bool        contains(Move move) const { return std::find(begin(), end(), move) != end(); }
 
-#if !STOCKFISH
 	// 🌈 i番目の要素を返す
 	// 📝 生成された合法手からランダムに選びたい時などに用いる。
     const Move at(size_t i) const {
         ASSERT_LV3(i < size());
         return begin()[i];
     }
-#endif
 
    private:
     // moveList : 指し手生成バッファ。自前で持っている。

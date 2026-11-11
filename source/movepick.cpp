@@ -125,9 +125,7 @@ MovePicker::MovePicker(const Position&              p,
                        const PieceToHistory**       ch,
                        const SharedHistories*       sh,
                        int                          pl
-#if !STOCKFISH
                        ,bool generate_all_legal_moves
-#endif
                        ) :
     pos(p),
     mainHistory(mh),
@@ -138,26 +136,12 @@ MovePicker::MovePicker(const Position&              p,
     ttMove(ttm),
     depth(d),
     ply(pl)
-#if STOCKFISH
-#else
     ,
     generate_all_legal_moves(generate_all_legal_moves)
-#endif
 {
     // 次の指し手生成の段階
     // 王手がかかっているなら王手回避のフェーズへ。さもなくばQSEARCHのフェーズへ。
 
-#if STOCKFISH
-	if (pos.in_check())
-        // 王手がかかっているなら回避手
-		stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm));
-
-    else
-        // 王手がかかっていないなら通常探索用/静止探索の指し手生成
-        // ⇨ 通常探索から呼び出されたのか、静止探索から呼び出されたのかについてはdepth > 0 によって判定できる。
-        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT)
-              + !(ttm && pos.pseudo_legal(ttm));
-#else
 	// 🌈 やねうら王では、pos.pseudo_legal()にgenerate_all_legal_movesを渡してやる必要がある。
 
     if (pos.in_check())
@@ -169,7 +153,6 @@ MovePicker::MovePicker(const Position&              p,
         // ⇨ 通常探索から呼び出されたのか、静止探索から呼び出されたのかについてはdepth > 0 によって判定できる。
         stage = (depth > 0 ? MAIN_TT : QSEARCH_TT)
               + !(ttm && pos.pseudo_legal(ttm, generate_all_legal_moves));
-#endif
 
 	// ⇨ Stockfish 16のコード、ttm(置換表の指し手)は無条件でこのMovePickerが返す1番目の指し手としているが、これだと
     //    TTの指し手だけで千日手になってしまうことがある。これは、将棋ではわりと起こりうる。
@@ -209,20 +192,14 @@ MovePicker::MovePicker(const Position&              p,
 // ⇨ SEEの値がth以上となるcaptureの指し手(歩の成りは含む)だけを生成する。
 
 MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceToHistory* cph
-#if STOCKFISH
-#else
     , bool generate_all_legal_moves
-#endif
 
                        ) :
     pos(p),
     captureHistory(cph),
     ttMove(ttm),
     threshold(Value(th))
-#if STOCKFISH
-#else
     ,generate_all_legal_moves(generate_all_legal_moves)
-#endif
 
     {
 
@@ -236,16 +213,11 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     stage = PROBCUT_TT
       + !(
         ttm
-#if STOCKFISH        
-        && pos.capture_stage(ttm)
-        && pos.pseudo_legal(ttm) 
-#else
         && pos.capture(ttm)
         // 注意 : ⇑ ProbCutの指し手生成(PROBCUT_INIT)で、
         // 歩の成りも生成するなら、ここはcapture_or_pawn_promotion()、しないならcapture()にすること。
         // ただし、TTの指し手は優遇した方が良い可能性もある。
         && pos.pseudo_legal(ttm, generate_all_legal_moves) 
-#endif
 	    );
     // ⇨ qsearch()のTTと同様、置換表の指し手に関してはsee_geの条件、
     // つけないほうがいい可能性があるが、やってみたら良くなかった。(V774v2 vs V774v3)
@@ -264,34 +236,16 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
 template<GenType Type>
 ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 
-#if STOCKFISH
-	static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
-#else
     static_assert(Type == CAPTURES || Type == CAPTURES_ALL || Type == QUIETS || Type == QUIETS_ALL
                     || Type == EVASIONS || Type == EVASIONS_ALL,
                   "Wrong type");
-#endif
 
 	Color us = pos.side_to_move();
 
 	// 自分より価値の安い駒で当たりになっているか
 
-#if STOCKFISH
-    [[maybe_unused]] Bitboard threatByLesser[KING + 1];
-	if constexpr (Type == QUIETS)
-#else
     if constexpr (Type == QUIETS || Type == QUIETS_ALL)
-#endif
 	{
-#if STOCKFISH
-        threatByLesser[PAWN]   = 0;
-        threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
-        threatByLesser[ROOK] =
-          pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
-        threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
-        threatByLesser[KING]  = 0;
-
-#else
 
 #if 0
 		// 🌈　Stockfishのコードを忠実に実装すると将棋ではたくさんの利きを計算しなくてはならないので
@@ -306,7 +260,6 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 #endif
 		// →　やってみたが強くならないのでコメントアウトする。[2022/04/26]
 
-#endif
 	}
 
     ExtMove* it = cur;
@@ -347,11 +300,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 			// Stockfishとは駒点が異なるので、この部分の係数を調整する必要がある。
 			//
 		}
-#if STOCKFISH
-		else if constexpr (Type == QUIETS)
-#else
         else if constexpr (Type == QUIETS || Type == QUIETS_ALL)
-#endif
 		{
 			// 駒を取らない指し手をオーダリングする。
 			// ここ、歩以外の成りも含まれているのだが…。
@@ -370,21 +319,6 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 			m.value += ((pos.check_squares(pt) & to) && pos.see_ge(m, -75)) * 16384;
 			// これ、効果があるのか検証したほうが良さげ。
 
-#if STOCKFISH
-			// penalty for moving to a square threatened by a lesser piece
-			// or bonus for escaping an attack by a lesser piece.
-
-			// 格下の駒に脅かされているマスに移動する際のペナルティ  
-			// または格下の駒による攻撃から逃れる際のボーナス
-
-			//  📓 移動元の駒が安い駒で当たりになっている場合、
-			//      移動させることでそれを回避できるなら価値を上げておく。
-
-            int v = 20 * (bool(threatByLesser[pt] & from) - bool(threatByLesser[pt] & to));
-            m.value += PieceValue[pt] * v;
-
-			// → Stockfishのコードそのままは書けない。
-#endif
 
 			// lowPlyHistoryも加算
 			if (ply < LOW_PLY_HISTORY_SIZE)
@@ -474,14 +408,6 @@ top:
     case PROBCUT_INIT :
     case QCAPTURE_INIT : {
 
-#if STOCKFISH
-        MoveList<CAPTURES> ml(pos);
-
-        cur = endBadCaptures = moves;
-
-        // 駒を捕獲する指し手に対してオーダリングのためのスコアをつける
-        endCur = endCaptures = score<CAPTURES>(ml);
-#else
         if (generate_all_legal_moves)
         {
             MoveList<CAPTURES_ALL> ml(pos);
@@ -494,7 +420,6 @@ top:
             cur = endBadCaptures = moves;
             endCur = endCaptures = score<CAPTURES>(ml);
         }
-#endif
 
         // captureの指し手はそんなに数多くないので全数ソートで問題ないし、全数ソートした方が良い。
         partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
@@ -561,11 +486,6 @@ top:
 
 			*/
 
-#if STOCKFISH
-            MoveList<QUIETS> ml(pos);
-
-            endCur = endGenerated = score<QUIETS>(ml);
-#else
 			if (generate_all_legal_moves)
 			{
                 MoveList<QUIETS_ALL> ml(pos);
@@ -579,7 +499,6 @@ top:
 			}
             // ⚠ ここ⇑、CAPTURE_INITで生成した指し手に歩の成りの指し手が
 			//     含まれているなら、それを除外しなければならない。
-#endif						
 
 			/*
 				📓
@@ -646,12 +565,6 @@ top:
 
 	// 王手回避手の生成
     case EVASION_INIT : {
-#if STOCKFISH
-        MoveList<EVASIONS> ml(pos);
-
-        cur    = moves;
-        endCur = endGenerated = score<EVASIONS>(ml);
-#else
 		if (generate_all_legal_moves)
 		{
             MoveList<EVASIONS_ALL> ml(pos);
@@ -665,7 +578,6 @@ top:
 			// 王手を回避する指し手に対してオーダリングのためのスコアをつける
             endCur = endGenerated = score<EVASIONS>(ml);
 		}
-#endif
 
         partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
 

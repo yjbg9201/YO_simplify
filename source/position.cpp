@@ -14,7 +14,6 @@
 using namespace std;
 namespace YaneuraOu {
 
-#if !STOCKFISH
 using namespace Effect8;
 using namespace Eval;
 
@@ -35,20 +34,11 @@ constexpr bool minor_piece_table[PIECE_NB] = {
 // minor pieceかを判定する。
 constexpr bool is_minor_piece(Piece pc) { return minor_piece_table[pc]; }
 
-#endif
 
 // 局面のhash keyを求めるときに用いるZobrist key
 // 💡 board_keyはZobrist::psqをxorしていく。hand_keyはZobrist::handを加算していく。key = board_key ^ hand_key。
 namespace Zobrist {
 
-#if STOCKFISH
-
-Key psq[PIECE_NB][SQUARE_NB];
-Key enpassant[FILE_NB];
-Key castling[CASTLING_RIGHT_NB];
-Key side, noPawns;
-
-#else
 
 // 💡 Stockfishでは、Keyはuint64_tなので zeroは単に 0と書けるが、
 //     やねうら王は、HASH_KEYは64,128,256bitに拡張しているので…。
@@ -68,7 +58,6 @@ Key hand[COLOR_NB][PIECE_HAND_NB];
 // 歩の陣形に関して盤上に歩が一枚もない時のhash key
 Key noPawns;
 
-#endif
 };
 
 // ----------------------------------
@@ -186,44 +175,9 @@ std::string pretty(Piece pc) {
 
 
 
-#if STOCKFISH
-// Helper function used to set castling
-// rights given the corresponding color and the rook starting square.
-void Position::set_castling_right(Color c, Square rfrom) {
-
-    Square         kfrom = square<KING>(c);
-    CastlingRights cr    = c & (kfrom < rfrom ? KING_SIDE : QUEEN_SIDE);
-
-    st->castlingRights |= cr;
-    castlingRightsMask[kfrom] |= cr;
-    castlingRightsMask[rfrom] |= cr;
-    castlingRookSquare[cr] = rfrom;
-
-    Square kto = relative_square(c, cr & KING_SIDE ? SQ_G1 : SQ_C1);
-    Square rto = relative_square(c, cr & KING_SIDE ? SQ_F1 : SQ_D1);
-
-    castlingPath[cr] = (between_bb(rfrom, rto) | between_bb(kfrom, kto)) & ~(kfrom | rfrom);
-}
-#endif
 
 // Sets king attacks to detect if a move gives check
 // 移動によってチェック（王手）になるかを検出するために、kingへの利きを設定する
-#if STOCKFISH
-void Position::set_check_info() const {
-
-    update_slider_blockers(WHITE);
-    update_slider_blockers(BLACK);
-
-    Square ksq = square<KING>(~sideToMove);
-
-    st->checkSquares[PAWN]   = attacks_bb<PAWN>(ksq, ~sideToMove);
-    st->checkSquares[KNIGHT] = attacks_bb<KNIGHT>(ksq);
-    st->checkSquares[BISHOP] = attacks_bb<BISHOP>(ksq, pieces());
-    st->checkSquares[ROOK]   = attacks_bb<ROOK>(ksq, pieces());
-    st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
-    st->checkSquares[KING]   = 0;
-}
-#else
 template<bool doNullMove, Color Us>
 void Position::set_check_info() const {
 
@@ -269,7 +223,6 @@ void Position::set_check_info() const {
     st->checkSquares[HORSE]      = st->checkSquares[BISHOP] | kingEffect(ksq);
     st->checkSquares[DRAGON]     = st->checkSquares[ROOK] | kingEffect(ksq);
 }
-#endif
 
 
 // Computes the hash keys of the position, and other
@@ -283,18 +236,6 @@ void Position::set_check_info() const {
 
 void Position::set_state() const {
 
-#if STOCKFISH
-
-    st->key = st->materialKey = 0;
-    st->minorPieceKey         = 0;
-    st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = 0;
-    st->pawnKey                                   = Zobrist::noPawns;
-    st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
-    st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
-
-    set_check_info();
-
-#else
 
     // 🌈 やねうら王では、st->keyはboard_keyとhand_keyに分かれる。
     st->board_key = Zobrist::zero;
@@ -314,35 +255,8 @@ void Position::set_state() const {
 
     // 王手情報の初期化
     set_check_info<false>();
-#endif
 
 
-#if STOCKFISH
-    for (Bitboard b = pieces(); b;)
-    {
-        Square s  = pop_lsb(b);
-        Piece  pc = piece_on(s);
-        st->key ^= Zobrist::psq[pc][s];
-
-        if (type_of(pc) == PAWN)
-            st->pawnKey ^= Zobrist::psq[pc][s];
-
-        else
-        {
-            st->nonPawnKey[color_of(pc)] ^= Zobrist::psq[pc][s];
-
-            if (type_of(pc) != KING)
-            {
-                st->nonPawnMaterial[color_of(pc)] += PieceValue[pc];
-
-                // 📝 StockfishはKNIGHTとBISHOPをminor pieceとして扱っているっぽい。
-
-                if (type_of(pc) <= BISHOP)
-                    st->minorPieceKey ^= Zobrist::psq[pc][s];
-            }
-        }
-    }
-#else
     for (auto s : pieces())
     {
         auto pc = piece_on(s);
@@ -363,22 +277,7 @@ void Position::set_state() const {
 
 	st->hand = hand[sideToMove];
 
-#endif
 
-#if STOCKFISH
-    if (st->epSquare != SQ_NONE)
-        st->key ^= Zobrist::enpassant[file_of(st->epSquare)];
-
-    if (sideToMove == BLACK)
-        st->key ^= Zobrist::side;
-
-    st->key ^= Zobrist::castling[st->castlingRights];
-
-    for (Piece pc : Pieces)
-        for (int cnt = 0; cnt < pieceCount[pc]; ++cnt)
-            st->materialKey ^= Zobrist::psq[pc][8 + cnt];
-
-#else
 
     // 🌈 将棋では、WHITEが後手番なので、WHITEのほうをZobrist::sideにしておく。
     if (sideToMove == WHITE)
@@ -386,7 +285,6 @@ void Position::set_state() const {
 
 	// st->materialKeyは、put_piece_for_partial_key()で更新済み。
 
-#endif
 }
 
 
@@ -400,11 +298,6 @@ void Position::set_state() const {
 
 // sfen文字列で盤面を設定する
 std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo* si) {
-#if STOCKFISH
-
-	std::memset(this, 0, sizeof(Position));
-    std::memset(si, 0, sizeof(StateInfo));
-#else
 
     // 🌈 やねうら王ではPositionがPODでない(BitboardやHASH_KEYがPODでない)ので
     //    コンパイル時にwarningが出るからvoid*にcastする。
@@ -414,7 +307,6 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
     // ThreadPool::start_thinking()では、
     // ここをいったんゼロクリアしたのちに、呼び出し側で、そのsiを復元することにより、局面を遡る。
     std::memset(static_cast<void*>(si), 0, sizeof(StateInfo));
-#endif
 
     st = si;
 
@@ -607,78 +499,10 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
     if (ct != 0)
         return PositionSetError("Invalid SFEN. Missing hand piece after count.");
 
-#if STOCKFISH
-    // 3. Castling availability. Compatible with 3 standards: Normal FEN standard,
-    // Shredder-FEN that uses the letters of the columns on which the rooks began
-    // the game instead of KQkq and also X-FEN standard that, in case of Chess960,
-    // if an inner rook is associated with the castling right, the castling tag is
-    // replaced by the file letter of the involved rook, as for the Shredder-FEN.
-
-    while ((ss >> token) && !isspace(token))
-    {
-        Square rsq;
-        Color  c    = islower(token) ? BLACK : WHITE;
-        Piece  rook = make_piece(c, ROOK);
-
-        token = char(toupper(token));
-
-        if (token == 'K')
-            for (rsq = relative_square(c, SQ_H1); piece_on(rsq) != rook; --rsq)
-            {}
-
-        else if (token == 'Q')
-            for (rsq = relative_square(c, SQ_A1); piece_on(rsq) != rook; ++rsq)
-            {}
-
-        else if (token >= 'A' && token <= 'H')
-            rsq = make_square(File(token - 'A'), relative_rank(c, RANK_1));
-
-        else
-            continue;
-
-        set_castling_right(c, rsq);
-    }
-
-    // 4. En passant square.
-    // Ignore if square is invalid or not on side to move relative rank 6.
-    bool enpassant = false;
-
-    if (((ss >> col) && (col >= 'a' && col <= 'h'))
-        && ((ss >> row) && (row == (sideToMove == WHITE ? '6' : '3'))))
-    {
-        st->epSquare = make_square(File(col - 'a'), Rank(row - '1'));
-
-        // En passant square will be considered only if
-        // a) side to move have a pawn threatening epSquare
-        // b) there is an enemy pawn in front of epSquare
-        // c) there is no piece on epSquare or behind epSquare
-        enpassant = attacks_bb<PAWN>(st->epSquare, ~sideToMove) & pieces(sideToMove, PAWN)
-                 && (pieces(~sideToMove, PAWN) & (st->epSquare + pawn_push(~sideToMove)))
-                 && !(pieces() & (st->epSquare | (st->epSquare + pawn_push(sideToMove))));
-    }
-
-    if (!enpassant)
-        st->epSquare = SQ_NONE;
-
-#endif
 
     // 5-6. Halfmove clock and fullmove number
     // 5-6. 手数(平手の初期局面からの手数)
 
-#if STOCKFISH
-    // 📝 Stockfishの場合、rule50とgamePlyが渡される。
-    //     このgamePlyは自分が指した回数なのでこれを2倍して、現在の手番(先手なら+0、後手なら+1)を
-    //     足してやる必要があ。
-
-    ss >> std::skipws >> st->rule50 >> gamePly;
-
-    // Convert from fullmove starting from 1 to gamePly starting from 0,
-    // handle also common incorrect FEN with fullmove = 0.
-    gamePly = std::max(2 * (gamePly - 1), 0) + (sideToMove == BLACK);
-
-    chess960 = isChess960;
-
-#else
 
     // gamePlyとして将棋所では(検討モードなどにおいて)ここで常に1が渡されている。
 
@@ -687,7 +511,6 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
     gamePly = 0;
     ss >> std::skipws >> gamePly;
 
-#endif
 
     // --- StateInfoの更新
 
@@ -707,16 +530,12 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
 
     // --- validation
 
-#if STOCKFISH
-    assert(pos_is_ok());
-#else
 
 #if ASSERT_LV >= 3
     // これassertにしてしまうと、先手玉のいない局面や駒落ちの局面で落ちて困る。
     if (!is_ok(*this))
         std::cout << "info string Illigal Position?" << endl;
 		// ⚠ UnitTestで駒落ちのテストをするので、そのときに引っかかるが…。
-#endif
 #endif
 
     return std::nullopt;
@@ -729,55 +548,6 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
 
 // 📝 局面のsfen文字列を取得する。Position::set()の逆変換。
 
-#if STOCKFISH
-
-string Position::fen() const {
-
-    int                emptyCnt;
-    std::ostringstream ss;
-
-    for (Rank r = RANK_8; r >= RANK_1; --r)
-    {
-        for (File f = FILE_A; f <= FILE_H; ++f)
-        {
-            for (emptyCnt = 0; f <= FILE_H && empty(make_square(f, r)); ++f)
-                ++emptyCnt;
-
-            if (emptyCnt)
-                ss << emptyCnt;
-
-            if (f <= FILE_H)
-                ss << PieceToChar[piece_on(make_square(f, r))];
-        }
-
-        if (r > RANK_1)
-            ss << '/';
-    }
-
-    ss << (sideToMove == WHITE ? " w " : " b ");
-
-    if (can_castle(WHITE_OO))
-        ss << (chess960 ? char('A' + file_of(castling_rook_square(WHITE_OO))) : 'K');
-
-    if (can_castle(WHITE_OOO))
-        ss << (chess960 ? char('A' + file_of(castling_rook_square(WHITE_OOO))) : 'Q');
-
-    if (can_castle(BLACK_OO))
-        ss << (chess960 ? char('a' + file_of(castling_rook_square(BLACK_OO))) : 'k');
-
-    if (can_castle(BLACK_OOO))
-        ss << (chess960 ? char('a' + file_of(castling_rook_square(BLACK_OOO))) : 'q');
-
-    if (!can_castle(ANY_CASTLING))
-        ss << '-';
-
-    ss << (ep_square() == SQ_NONE ? " - " : " " + UCIEngine::square(ep_square()) + " ")
-       << st->rule50 << " " << 1 + (gamePly - (sideToMove == BLACK)) / 2;
-
-    return ss.str();
-}
-
-#else
 
 const std::string Position::sfen(int gamePly_) const
 {
@@ -853,7 +623,6 @@ const std::string Position::sfen(int gamePly_) const
 
 	return ss.str();
 }
-#endif
 
 
 // Calculates st->blockersForKing[c] and st->pinners[~c],
@@ -874,10 +643,6 @@ void Position::update_slider_blockers(Color c) const {
     // Snipers are sliders that attack 's' when a piece and other snipers are removed
     // snipersとは、pinされている駒が取り除かれたときに王の升に利きが発生する大駒である。
 
-#if STOCKFISH
-    Bitboard snipers = (  (attacks_bb<  ROOK>(ksq) & pieces(QUEEN, ROOK))
-                        | (attacks_bb<BISHOP>(ksq) & pieces(QUEEN, BISHOP))) & pieces(~c);
-#else
 
 	// cが与えられていないと香の利きの方向を確定させることが出来ない。
     // ゆえに将棋では、この関数は手番を引数に取るべき。(チェスとはこの点において異なる。)
@@ -888,7 +653,6 @@ void Position::update_slider_blockers(Color c) const {
        // 香に関しては先手玉へのsniperなら、玉より上側をサーチして、そこにある後手の香を探す必要がある。
        | (pieces(LANCE) & lanceStepEffect(c, ksq)))
       & pieces(~c);
-#endif
 
     // snipersを取り除いた障害物(駒)
     Bitboard occupancy = pieces() ^ snipers;
@@ -960,21 +724,6 @@ Bitboard Position::attackers_to(Square sq, const Bitboard& occ) const {
 
 }
 
-#if STOCKFISH
-
-// castlingの判定のために使う。
-
-bool Position::attackers_to_exist(Square s, Bitboard occupied, Color c) const {
-
-    return ((attacks_bb<ROOK>(s) & pieces(c, ROOK, QUEEN))
-            && (attacks_bb<ROOK>(s, occupied) & pieces(c, ROOK, QUEEN)))
-        || ((attacks_bb<BISHOP>(s) & pieces(c, BISHOP, QUEEN))
-            && (attacks_bb<BISHOP>(s, occupied) & pieces(c, BISHOP, QUEEN)))
-        || (((attacks_bb<PAWN>(s, ~c) & pieces(PAWN)) | (attacks_bb<KNIGHT>(s) & pieces(KNIGHT))
-             | (attacks_bb<KING>(s) & pieces(KING)))
-            & pieces(c));
-}
-#endif
 
 
 // 🚧
@@ -1586,14 +1335,10 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
     // 現在の局面のhash keyはこれで、これを更新していき、
     // 次の局面のhash keyを求めてStateInfo::key_に格納。
-#if STOCKFISH
-    Key k = st->key ^ Zobrist::side;
-#else
     Key k = st->board_key ^ Zobrist::side;
 
     // 🌈 将棋だと手駒がある。手駒用のhash keyを別途用意
     Key h = st->hand_key;
-#endif
 
     // Copy some fields of the old state to our new StateInfo object except the
     // ones which are going to be recalculated from scratch anyway and then switch
@@ -1612,11 +1357,7 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 		細かい更新処理が必要なものはここに載せておけばundoが速くなる。
 	*/
 
-#if STOCKFISH
-    std::memcpy(&newSt, st, offsetof(StateInfo, key));
-#else
     std::memcpy(static_cast<void*>(&newSt), st, offsetof(StateInfo, board_key));
-#endif
     newSt.previous = st;
     st             = &newSt;
 
@@ -1630,19 +1371,11 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
     ++gamePly;
 
-#if STOCKFISH
-    ++st->rule50;
-#endif
     ++st->pliesFromNull;
 
-#if STOCKFISH
-    Color us   = sideToMove;
-    Color them = ~us;
-#else
     // 🌈 やねうら王では手番がtemplate引数になっている。
     constexpr Color us   = Us;
     constexpr Color them = ~Us;
-#endif
 
 
     // 評価値の差分計算用の初期化
@@ -1690,12 +1423,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 	*/
 
 
-#if STOCKFISH
-    Square from     = m.from_sq();
-    Square to       = m.to_sq();
-    Piece  pc       = piece_on(from);
-    Piece  captured = m.type_of() == EN_PASSANT ? make_piece(them, PAWN) : piece_on(to);
-#else
     // 将棋だと手駒から打てるのでこの時点ではfromとpcは確定できない。
 
     // 移動先の升
@@ -1710,7 +1437,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
     ASSERT_LV3(type_of(captured) != KING);
 
-#endif
 
     // 駒割りの差分計算用
     int materialDiff;
@@ -1835,9 +1561,7 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
             // 捕獲された駒が盤上から消えるので局面のhash keyを更新する
             k ^= Zobrist::psq[captured][capsq];
-#if !STOCKFISH
             h += Zobrist::hand[Us][pr];
-#endif
 
             // 評価関数で使う駒割りの値も更新
             materialDiff += Eval::CapturePieceValue[captured];
@@ -2262,36 +1986,11 @@ void Position::do_null_move(StateInfo& newSt, const T& tt) {
 	ASSERT_LV3(!checkers());
 	ASSERT_LV3(&newSt != st);
 
-#if STOCKFISH
-    std::memcpy(&newSt, st, sizeof(StateInfo));
-#else
 	std::memcpy(static_cast<void*>(& newSt), st, sizeof(StateInfo));
-#endif
 
 	newSt.previous = st;
     st             = &newSt;
 
-#if STOCKFISH
-	if (st->epSquare != SQ_NONE)
-    {
-        st->key ^= Zobrist::enpassant[file_of(st->epSquare)];
-        st->epSquare = SQ_NONE;
-    }
-
-    st->key ^= Zobrist::side;
-    prefetch(tt.first_entry(key()));
-
-	st->pliesFromNull = 0;
-
-    sideToMove = ~sideToMove;
-
-    set_check_info();
-
-    st->repetition = 0;
-
-    assert(pos_is_ok());
-
-#else
 
     // NNUEの場合、KPPT型と違って、手番が違う場合、計算なしに済ますわけにはいかない。
     st->accumulator.computed_score = false;
@@ -2339,7 +2038,6 @@ void Position::do_null_move(StateInfo& newSt, const T& tt) {
 #endif
 
 	ASSERT_LV5(pos_is_ok());
-#endif
 }
 
 void Position::do_null_move(StateInfo& newSt) {
@@ -2385,25 +2083,16 @@ bool Position::see_ge(Move m, Value threshold) const
 {
 	ASSERT_LV3(m.is_ok());
 
-#if STOCKFISH
-    // Only deal with normal moves, assume others pass a simple SEE
-    if (type_of(m) != NORMAL)
-        return VALUE_ZERO >= threshold;
-#endif
 
 	bool drop = m.is_drop();
 
 	// 以下、Stockfishの挙動をなるべく忠実に再現する。
 
-#if STOCKFISH
-    Square from = m.from_sq(), to = m.to_sq();
-#else
 	// 駒の移動元(駒打ちの場合は)と移動先。
 	// dropのときにはSQ_NBにしておくことで、pieces() ^ fromを無効化するhack
 	// ※　piece_on(SQ_NB)で NO_PIECE が返ることは保証されている。
 	Square from = drop ? SQ_NB : m.from_sq();
 	Square to   = m.to_sq();
-#endif
 
 	/*
 		📓
@@ -2427,22 +2116,14 @@ bool Position::see_ge(Move m, Value threshold) const
 	//   PieceValue[piece_on(to)] - 最初に動かす駒の価値 >= threshold
 	// なら、取り返されたところですでにしきい値以上になることは確定しているのでtrueが返せる。
 
-#if STOCKFISH
-	swap = PieceValue[piece_on(from)] - swap;
-#else
 	// →　駒打ちの時は、移動元にその駒がないので、これを復元してやる必要がある。
 	PieceType from_pt = drop ? m.move_dropped_piece() : type_of(piece_on(from));
     swap = PieceValue[from_pt] - swap;
-#endif
 
 	if (swap <= 0)
         return true;
 
-#if STOCKFISH
-	assert(color_of(piece_on(from)) == sideToMove);
-#else
 	ASSERT_LV3(drop || color_of(piece_on(from)) == sideToMove);
-#endif
 
     Bitboard occupied  = pieces() ^ from ^ to;  // xoring to is important for pinned piece logic
     Color    stm       = sideToMove;
@@ -2487,22 +2168,14 @@ bool Position::see_ge(Move m, Value threshold) const
             if ((swap = PawnValue - swap) < res)
                 break;
 
-#if STOCKFISH
-            occupied ^= least_significant_square_bb(bb);
-            attackers |= attacks_bb<BISHOP>(to, occupied) & pieces(BISHOP, QUEEN);
-            // →　チェスではPAWNで取る時、PAWNが斜めに移動するので、toの斜め(X-ray)にある駒を
-            //    attackersとして追加する必要があるが、将棋の場合は、歩の背後にいる香・飛車を追加する必要がある。
-#endif
         }
 
-#if !STOCKFISH
         // 香を試す(将棋only)
         else if ((bb = stmAttackers & pieces(LANCE)))
         {
             if ((swap = LanceValue - swap) < res)
                 break;
         }
-#endif
         else if ((bb = stmAttackers & pieces(KNIGHT)))
         {
             if ((swap = KnightValue - swap) < res)
@@ -2514,7 +2187,6 @@ bool Position::see_ge(Move m, Value threshold) const
             continue;
         }
 
-#if !STOCKFISH
         // 銀を試す(将棋only)
         else if ((bb = stmAttackers & pieces(SILVER)))
         {
@@ -2529,29 +2201,19 @@ bool Position::see_ge(Move m, Value threshold) const
             if ((swap = GoldValue - swap) < res)
                 break;
         }
-#endif
 
         else if ((bb = stmAttackers & pieces(BISHOP)))
         {
             if ((swap = BishopValue - swap) < res)
                 break;
-#if STOCKFISH
-            occupied ^= least_significant_square_bb(bb);
-            attackers |= attacks_bb<BISHOP>(to, occupied) & pieces(BISHOP, QUEEN);
-#endif
         }
 
         else if ((bb = stmAttackers & pieces(ROOK)))
         {
             if ((swap = RookValue - swap) < res)
                 break;
-#if STOCKFISH
-            occupied ^= least_significant_square_bb(bb);
-            attackers |= attacks_bb<ROOK>(to, occupied) & pieces(ROOK, QUEEN);
-#endif
         }
 
-#if !STOCKFISH
         // 馬を試す(将棋only)
         else if ((bb = stmAttackers & pieces(HORSE)))
         {
@@ -2569,24 +2231,12 @@ bool Position::see_ge(Move m, Value threshold) const
             //occupied ^= least_significant_square_bb(bb);
             //attackers |= attacks_bb<ROOK>(to, occupied) & pieces(ROOK, QUEEN);
         }
-#endif
 
-#if STOCKFISH
-        else if ((bb = stmAttackers & pieces(QUEEN)))
-        {
-            if ((swap = QueenValue - swap) < res)
-                break;
-            occupied ^= least_significant_square_bb(bb);
-            attackers |= (attacks_bb<BISHOP>(to, occupied) & pieces(BISHOP, QUEEN))
-                       | (attacks_bb<ROOK>(to, occupied) & pieces(ROOK, QUEEN));
-        }
-#endif
         else  // KING
               // If we "capture" with the king but the opponent still has attackers,
               // reverse the result.
             return (attackers & ~pieces(stm)) ? res ^ 1 : res;
 
-#if !STOCKFISH
         /*
 			occupied ^= least_significant_square_bb(bb);
 			attackers |= attacks_bb<BISHOP>(to, occupied) & pieces(BISHOP, QUEEN);
@@ -2633,7 +2283,6 @@ bool Position::see_ge(Move m, Value threshold) const
 
         // SEEって、最後、toの地点で成れるなら、その成ることによる価値上昇分も考慮すべきだと思うのだが、
         // そうすると早期枝刈りができないことになるので、とりあえず、このままでいいや。
-#endif
 	}
 
     return bool(res);
@@ -3022,43 +2671,12 @@ Move Position::DeclarationWin() const
 
 void Position::flip() {
 
-#if STOCKFISH
-    string            f, token;
-    std::stringstream ss(fen());
-
-    for (Rank r = RANK_8; r >= RANK_1; --r)  // Piece placement
-    {
-        std::getline(ss, token, r > RANK_1 ? '/' : ' ');
-        f.insert(0, token + (f.empty() ? " " : "/"));
-    }
-
-    ss >> token;                        // Active color
-    f += (token == "w" ? "B " : "W ");  // Will be lowercased later
-
-    ss >> token;  // Castling availability
-    f += token + " ";
-
-    std::transform(f.begin(), f.end(), f.begin(),
-                   [](char c) { return char(islower(c) ? toupper(c) : tolower(c)); });
-
-    ss >> token;  // En passant square
-    f += (token == "-" ? token : token.replace(1, 1, token[1] == '3' ? "6" : "3"));
-
-    std::getline(ss, token);  // Half and full moves
-    f += token;
-
-    set(f, is_chess960(), st);
-
-    assert(pos_is_ok());
-
-#else
 
 	auto f_sfen = flipped_sfen();
     set(f_sfen, st);
 
 	ASSERT_LV5(pos_is_ok());
 
-#endif
 }
 
 

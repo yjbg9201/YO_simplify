@@ -155,11 +155,6 @@ struct RootMove
 	// このスレッドがrootから最大、何手目まで探索したか(選択深さの最大)
 	int selDepth           = 0;
 
-#if STOCKFISH
-	// 💡 チェスのtablebase絡みの変数。将棋では未使用。
-	int tbRank          = 0;
-	Value tbScore;
-#endif
 
 	// この指し手で進めたときのpv
 	PVMoves pv;
@@ -184,9 +179,7 @@ struct LimitsType {
 
         byoyomi[WHITE] = byoyomi[BLACK] = TimePoint(0);
         rtime                           = 0;
-#if !STOCKFISH
         disablePvInterval               = false;
-#endif
     }
 
     // 時間制御を行うのか。
@@ -208,11 +201,7 @@ struct LimitsType {
     // movetime  : 思考時間固定(0以外が指定してあるなら) : 単位は[ms]
     // startTime : 探索開始時刻。"go"コマンドを受け取った時のnow()。なるべく早くに格納しておき、時差をなくす。
     //             💡 この時刻は、USIEngineの"go"のhandlerで設定される。
-#if STOCKFISH
-    TimePoint time[COLOR_NB], inc[COLOR_NB], npmsec, movetime, startTime;
-#else
     TimePoint time[COLOR_NB], inc[COLOR_NB] /*, npmsec*/, movetime, startTime;
-#endif
 
     // movestogo: あと何手で引き分けとなるか。
     //			📌 USIプロトコルではサポートしない。エンジンオプションで設定すべき。
@@ -225,11 +214,7 @@ struct LimitsType {
     //		時間制限なしであれば、INT32_MAXが入っている。
     // perft    : perft(performance test)中であるかのフラグ。非0なら、perft時の深さが入る。
     // infinite : 思考時間無制限かどうかのフラグ。非0なら無制限。
-#if STOCKFISH
-    int movestogo, depth, mate, perft, infinite;
-#else
     int /* movestogo,*/ depth, mate, perft, infinite;
-#endif
 
     // 今回のgoコマンドでの指定されていた"nodes"(探索ノード数)の値。
     // これは、USIプロトコルで規定されているものの将棋所では送ってこない。ShogiGUIはたぶん送ってくる。
@@ -241,8 +226,6 @@ struct LimitsType {
     //     そちらは、"stop"か"ponderhit"が来るとfalseになるが、こちらは、変化しない。
     bool ponderMode;
 
-#if STOCKFISH
-#else
     // 🌈 やねうら王が将棋用に追加したメンバー
 
     // 秒読み(ms換算で)
@@ -253,7 +236,6 @@ struct LimitsType {
 
     // benchコマンド中はPV出力間隔の抑制を無効化して、最終info nodesを安定して取得する。
     bool disablePvInterval;
-#endif
 };
 
 // The UCI stores the uci options, thread pool, and transposition table.
@@ -311,10 +293,6 @@ struct InfoFull: InfoShort {
     // "multipv"の値。
     size_t multiPV;
 
-#if STOCKFISH
-    // 💡勝率はやねうら王では使わない
-    std::string_view wdl;
-#endif
 
     // boundを文字列化したもの
 	// 💡 評価値とともに出力されるupperboundとかlowerboundとか。
@@ -329,10 +307,6 @@ struct InfoFull: InfoShort {
     // NPS
     size_t nps;
 
-#if STOCKFISH
-    // 💡tbHitsもやねうら王では使わない。(tb = tablebases)
-    size_t           tbHits;
-#endif
 
     // PVを文字列化したもの
     std::string_view pv;
@@ -401,16 +375,8 @@ class Worker
 public:
 
 	Worker(SharedState& sharedState,
-#if STOCKFISH
-	,std::unique_ptr<ISearchManager> sm,
-	size_t threadIdx,
-	size_t numaThreadIdx,
-	size_t numaTotal,
-	NumaReplicatedAccessToken numaAccessToken)
-#else
           // 🌈 上記の4つの引数を一纏めにした構造体
           const ThreadIds& ids
-#endif
 	);
 
 	virtual ~Worker() { }
@@ -455,18 +421,6 @@ public:
 	virtual void ensure_network_replicated() {}
 
 	// 📝 やねうら王では、以下は、派生class(YaneuraOuWorker)側で実装する。
-#if STOCKFISH
-    // Public because they need to be updatable by the stats
-    ButterflyHistory mainHistory;
-    LowPlyHistory    lowPlyHistory;
-
-    CapturePieceToHistory           captureHistory;
-    ContinuationHistory             continuationHistory[2][2];
-    CorrectionHistory<Continuation> continuationCorrectionHistory;
-
-    TTMoveHistory    ttMoveHistory;
-    SharedHistories& sharedHistory;
-#endif
 
 protected:
 
@@ -474,36 +428,6 @@ protected:
 	// ⚠ do_move～undo_null_moveは、派生class側でのみ定義する。
 	//     これを仮想関数にしてしまうと、呼び出しのoverheadが気になる。
 
-#if STOCKFISH
-    //bool iterative_deepening();
-
-	void do_move(Position& pos, const Move move, StateInfo& st);
-	void do_move(Position& pos, const Move move, StateInfo& st, const bool givesCheck);
-	void do_null_move(Position& pos, StateInfo& st);
-	void undo_move(Position& pos, const Move move);
-	void undo_null_move(Position& pos);
-
-    // This is the main search function, for both PV and non-PV nodes
-    template<NodeType nodeType>
-    Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
-
-    // Quiescence search function, which is called by the main search
-    template<NodeType nodeType>
-    Value qsearch(Position& pos, Stack* ss, Value alpha, Value beta);
-
-    Depth reduction(bool i, Depth d, int mn, int delta) const;
-
-    // Pointer to the search manager, only allowed to be called by the main thread
-    SearchManager* main_manager() const {
-        assert(threadIdx == 0);
-        return static_cast<SearchManager*>(manager.get());
-    }
-
-    TimePoint elapsed() const;
-    TimePoint elapsed_time() const;
-
-    Value evaluate(const Position&);
-#endif
 
     // 今回の"go"コマンドで渡された思考条件
 	LimitsType limits;
@@ -517,11 +441,6 @@ protected:
     std::atomic<uint64_t> nodes /*, tbHits, bestMoveChanges*/;
 
 	// 📝 派生class側で。
-#if STOCKFISH
-    int selDepth, nmpMinPly;
-
-    Value optimism[COLOR_NB];
-#endif
 
 	// 🤔 外部からrootMovesにアクセスしたいことがあるので、やねうら王では
     //     このへんはpublicにしておく。
@@ -539,13 +458,6 @@ public:
 protected:
 
 	// 📝 派生class側で
-#if STOCKFISH
-    // 探索した深さ。
-    //Depth rootDepth, completedDepth;
-
-    // aspiration searchのroot delta
-    //Value rootDelta;
-#endif
 
     // 📑 Stockfishではこれらはコンストラクタで渡される。
 	//     やねうら王では、set_thread_ids()で渡される。
@@ -576,9 +488,6 @@ protected:
 
 
 	friend class YaneuraOu::ThreadPool;
-#if STOCKFISH
-    friend class SearchManager;
-#endif
 };
 
 

@@ -84,13 +84,7 @@ public:
 	using InfoFull   = Search::InfoFull;
 	using InfoIter   = Search::InfoIteration;
 
-#if STOCKFISH
-        // 💡 StockfishではEngineのコンストラクタでは、起動path(main関数で渡されたargv[0])を渡す。
-        //     やねうら王では、起動フォルダはCommandLine::gから取得できるので不要。
-        IEngine(std::optional<std::string> path = std::nullopt);
-#else
         IEngine() {}
-#endif
 
 	// Cannot be movable due to components holding backreferences to fields
     // フィールドへの逆参照を持つコンポーネントがあるため、ムーブ可能にはできない
@@ -105,11 +99,7 @@ public:
     virtual ~IEngine() { wait_for_search_finished(); }
 
 	// "perft"コマンド。perftとは、performance testの略。
-#if STOCKFISH
-    std::uint64_t perft(const std::string& fen, Depth depth, bool isChess960);
-#else
     virtual std::uint64_t perft(const std::string& fen, Depth depth) = 0;
-#endif
 
 	// "go"コマンド。ThreadPoolのmain threadに対して探索を開始(start_searching)する。
     // non blocking call to start searching
@@ -175,14 +165,12 @@ public:
     virtual void set_on_bestmove(std::function<void(std::string_view, std::string_view)>&&) {}
     virtual void set_on_verify_networks(std::function<void(std::string_view)>&&) {}
 
-#if !STOCKFISH
     virtual void set_on_update_string(std::function<void(std::string_view)>&&) {}
 
 	// 🌈 待避させたいことがあるので、getterも用意しておく。
     virtual std::function<void(std::string_view, std::string_view)> get_on_bestmove() {
         return [](auto, auto) {};
     }
-#endif
 
     // network related
 	// ネットワーク(評価関数)関連
@@ -192,15 +180,6 @@ public:
     virtual void verify_networks() const {}
 
 	// TODO あとで考える。
-#if STOCKFISH
-    // 評価関数の読み込み
-    void load_networks();
-
-	// Stockfishは大きいnetworkと小さいnetworkとがある。それぞれの読み込み。
-
-    void load_big_network(const std::string& file);
-    void load_small_network(const std::string& file);
-#endif
     // utility functions
 	// ユーティリティ関数
 
@@ -240,10 +219,6 @@ public:
     virtual std::string thread_binding_information_as_string() const { return ""; }
 
 
-#if STOCKFISH
-   private:
-    const std::string binaryDirectory;
-#endif
 
 	// 🌈 エンジンに追加オプションを設定したいときは、この関数をoverrideする。
 	//     この関数は、USIEngine::set_engine()のタイミングで呼び出される。
@@ -254,22 +229,9 @@ public:
 
 	// 📌 Properties
 
-#if STOCKFISH
-	// 📝 やねうら王では、これらはすべてEngineに持つ。
-
-    OptionsMap                                         options;
-    ThreadPool                                         threads;
-    TranspositionTable                                 tt;
-    LazyNumaReplicatedSystemWide<Eval::NNUE::Networks> networks;
-
-    Search::SearchManager::UpdateContext  updateContext;
-    std::function<void(std::string_view)> onVerifyNetworks;
-    std::map<NumaIndex, SharedHistories>  sharedHists;
-#else
 	// スレッドプール(探索用スレッド)の取得
 	virtual ThreadPool& get_threads() = 0;
 	virtual const ThreadPool& get_threads() const = 0;
-#endif
 
 	// 局面の取得
 	// 探索開始局面(root)を格納するPositionクラス
@@ -387,9 +349,6 @@ class Engine: public IEngine {
 	// 🌈 エンジンオプション"StochasticPonder"の値
 	bool stochastic_ponder = false;
 
-#if STOCKFISH    
-   protected:
-#endif   
     // 📌 エンジンを実装するために必要な最低限のコンポーネント
 
     //const std::string binaryDirectory;

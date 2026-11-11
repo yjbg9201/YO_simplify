@@ -23,17 +23,11 @@ namespace YaneuraOu {
 class USIEngine {
 public:
 
-#if STOCKFISH
-	// 📝 やねうら王では、CommandLine::gを見れば良いので、argc,argvは引数として渡さないことにした。
-	//     また、ここでやっている初期化は不要になったのでコンストラクタ自体を削除。
-	USIEngine(int argc, char** argv);
-#else
 	 // USIEngine classから使うEngine。
 	 // 📌 やねうら王独自。エンジンの実装を変更できるように、
 	 //     IEngine(エンジン interface)を渡し、エンジンを動的に切り替えたり、
 	 //     複数の異なるエンジンから成るUSIEngineを同時に使うことができるようにする。
 	 void set_engine(IEngine& _engine);
-#endif
 
 	// main threadをUSIメッセージの受信のために待機させる。
 	// "quit"コマンドが送られてくるまでこのループは抜けない。
@@ -47,12 +41,7 @@ public:
 	// --------------------
 
 	// 詰みやそれに類似した特別なスコアの処理なしに、Valueを整数のセントポーン数に変換する。
-#if STOCKFISH
-	static int         to_cp(Value v, const Position& pos);
-    // 📝 やねうら王では、Position&は不要。
-#else
 	static int   to_cp(Value v);
-#endif
 
     // USIプロトコルで用いるscoreにScore構造体の内容を変換する。
     static std::string format_score(const Score& s);
@@ -63,11 +52,6 @@ public:
     // USIプロトコルで使う指し手文字列に変換する。
     static std::string move(Move m /*, bool chess960*/);
 
-#if STOCKFISH
-    // 勝率文字列に変換する。
-    // 📌 将棋では評価値をcpで出力するので不要。
-    static std::string wdl(Value v, const Position& pos);
-#endif
 
 	// string全体を小文字化して返す。
     static std::string to_lower(std::string str);
@@ -77,11 +61,9 @@ public:
     // 💡 合法でない指し手の場合、エラーである旨を出力する。
     static Move to_move(const Position& pos, std::string str);
 
-#if !STOCKFISH
 	// USI形式から指し手への変換。本来この関数は要らないのだが、
     // 棋譜を大量に読み込む都合、この部分をそこそこ高速化しておきたい。
     static Move16 to_move16(const std::string& str);
-#endif
 
 	// "go"の後続文字列を解析して、それを反映させたSearch::LimitsTypeを返す。
     /*
@@ -89,16 +71,11 @@ public:
 	       参照したいので、OptionsMap&が必要になり、これはUSIEngineが持っているので
 	       このmethodをstaticにできない。
 	*/
-#if STOCKFISH
-    static Search::LimitsType parse_limits(std::istream& is);
-#else
     Search::LimitsType parse_limits(std::istream& is);
-#endif
 
     // エンジンオプション設定を取得する
     OptionsMap& engine_options() { return engine.get_options(); }
 
-#if !STOCKFISH
     // --------------------
     // 🌈 やねうら王独自 🌈
     // --------------------
@@ -141,21 +118,12 @@ public:
     // 単一エンジン起動用に、コマンドラインとstartup.txtのUSIコマンドをstd_inputに積む。
     void enqueue_startup_commands(const CommandLine& cli);
 
-#endif
 
 private:
 	// 内包している思考エンジン
-#if STOCKFISH
-	// main関数にコマンドラインから渡された引数
-	Engine engine;
-
-	CommandLine cli;
-	// 🌈 やねうら王では、CommandLine::gを用いるから、このclassが保持する必要がない。
-#else
 	// 🌈 やねうら王ではengineを切り替えられるようにIEngineをくるんだ
 	//     EngineWrapperというclassを用いる。
 	EngineWrapper engine;
-#endif
 
 	// string_viewを"\n"で複数行に分割して、それを"info string .."の形で出力する。
 	static void print_info_string(std::string_view str);
@@ -174,13 +142,11 @@ private:
 	void          setoption(std::istringstream& is);
 	std::uint64_t perft(const Search::LimitsType&);
 
-#if !STOCKFISH
 	// 🌈 やねうら王独自拡張 🌈
 
 	void isready();
     void moves();
     void getoption(std::istringstream& is);
-#endif
 
 	// 読み筋を出力するevent handler
 	// 📝 Engine class(およびその派生class)から、読み筋を出力したいタイミングで
@@ -191,9 +157,7 @@ private:
     static void on_update_full(const Engine::InfoFull& info /*, bool showWDL*/);
 	static void on_iter(const Engine::InfoIter& info);
 	static void on_bestmove(std::string_view bestmove, std::string_view ponder);
-#if !STOCKFISH
 	static void on_update_string(std::string_view info);
-#endif
 
     // すべての読み筋出力listenerを初期化する。
 	// 📝 set_engine()のタイミングでEngine側のset_on_XXXを呼び出して
@@ -206,7 +170,6 @@ private:
     [[noreturn]] void terminate_on_critical_error(const std::string& fullCommand,
                                                   const std::string& message);
 
-#if !STOCKFISH
 	// 🌈 やねうら王独自拡張 🌈
 
 	// ファイルからUSIコマンドをstd_inputに積む。
@@ -237,7 +200,6 @@ private:
 	// 上記2.
 	std::string last_go_cmd_string;
 
-#endif
 };
 
 

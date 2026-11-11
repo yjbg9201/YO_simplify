@@ -74,57 +74,6 @@ struct SearchOptions
 // 📌 Skill .. 手加減のための仕組み 📌
 //    やねうら王では実装しない。
 
-#if STOCKFISH
-// Skill structure is used to implement strength limit. If we have a UCI_Elo,
-// we convert it to an appropriate skill level, anchored to the Stash engine.
-// This method is based on a fit of the Elo results for games played between
-// Stockfish at various skill levels and various versions of the Stash engine.
-// Skill 0 .. 19 now covers CCRL Blitz Elo from 1320 to 3190, approximately
-// Reference: https://github.com/vondele/Stockfish/commit/a08b8d4e9711c2
-
-// Skill 構造体は強さ制限を実装するために使われる。
-// UCI_Elo が指定されている場合、Stash エンジンを基準として
-// 適切なスキルレベルに変換する。
-// この方法は、さまざまなスキルレベルの Stockfish と
-// さまざまなバージョンの Stash エンジンとの対局結果に基づいている。
-// 現在、Skill 0 から 19 は、おおよそ CCRL Blitz の Elo 1320 から 3190 をカバーする。
-// 参考: https://github.com/vondele/Stockfish/commit/a08b8d4e9711c2
-
-// 💡 Skill構造体は強さの制限の実装に用いられる。
-//    (わざと手加減して指すために用いる) →　やねうら王では未使用
-
-struct Skill {
-    // Lowest and highest Elo ratings used in the skill level calculation
-    constexpr static int LowestElo  = 1320;
-    constexpr static int HighestElo = 3190;
-
-    // skill_level : 手加減のレベル。20未満であれば手加減が有効。0が一番弱い。(R2000以上下がる)
-    // uci_elo     : 0以外ならば、そのelo ratingになるように調整される。
-    Skill(int skill_level, int uci_elo) {
-        if (uci_elo)
-        {
-            double e = double(uci_elo - LowestElo) / (HighestElo - LowestElo);
-            level = std::clamp((((37.2473 * e - 40.8525) * e + 22.2943) * e - 0.311438), 0.0, 19.0);
-        }
-        else
-            level = double(skill_level);
-    }
-
-    // 手加減が有効であるか。
-    bool enabled() const { return level < 20.0; }
-
-    // SkillLevelがNなら探索深さもNぐらいにしておきたいので、
-    // depthがSkillLevelに達したのかを判定する。
-    bool time_to_pick(Depth depth) const { return depth == 1 + int(level); }
-
-    // 手加減が有効のときはMultiPV = 4で探索
-    Move pick_best(const RootMoves&, size_t multiPV);
-
-    double level;
-    Move   best = Move::none();
-};
-
-#else
 
 // 💡 やねうら王ではSkillLevelを実装しない。
 struct Skill {
@@ -138,7 +87,6 @@ struct Skill {
     Move best = Move::none();
 };
 
-#endif
 
 
 // 残り時間チェックを行ったり、main threadからのみアクセスされる探索manager
@@ -148,21 +96,6 @@ struct Skill {
 class SearchManager {
    public:
     // 📝 やねうら王では、これはnamespace Searchで定義しておく。
-#if STOCKFISH
-    // Infoを更新した時のcallback。このcallbackを行うと標準出力に出力する。
-    using UpdateShort    = std::function<void(const InfoShort&)>;
-    using UpdateFull     = std::function<void(const InfoFull&)>;
-    using UpdateIter     = std::function<void(const InfoIteration&)>;
-    using UpdateBestmove = std::function<void(std::string_view, std::string_view)>;
-
-    // PVを設定した時に出力するためのlistener
-    struct UpdateContext {
-        UpdateShort    onUpdateNoMoves;  // root局面で指し手がない時のhandler
-        UpdateFull     onUpdateFull;
-        UpdateIter     onIter;
-        UpdateBestmove onBestmove;
-    };
-#endif
 
     SearchManager(const UpdateContext& updateContext) :
         updates(updateContext) {}
@@ -192,9 +125,6 @@ class SearchManager {
 		callsCnt           :     main threadが一定のnode数を探索するごとにcheck_time()を呼び出したいので、そのためのカウンター。
 	*/
     TimeManagement tm;
-#if STOCKFISH
-    double originalTimeAdjust;
-#endif
     int callsCnt;
 
     // "go ponder"実行中であるかのフラグ
@@ -320,11 +250,6 @@ class YaneuraOuEngine: public Engine {
     // 📌 StockfishのEngine classに合わせる 📌
 
     // 📝 やねうら王では、namespace Searchに書いてあるので不要。
-#if STOCKFISH
-    using InfoShort = Search::InfoShort;
-    using InfoFull  = Search::InfoFull;
-    using InfoIter  = Search::InfoIteration;
-#endif
 
     YaneuraOuEngine(/* std::optional<std::string> path = std::nullopt */) :
         manager(updateContext) {}
@@ -337,13 +262,6 @@ class YaneuraOuEngine: public Engine {
     //NumaReplicationContext numaContext;
 
     // 📝 やねうら王では、base classであるEngine classが持っている。
-#if STOCKFISH
-    Position     pos;
-    StateListPtr states;
-
-    OptionsMap options;
-    ThreadPool threads;
-#endif
 
     // 📝 以下は、Engine classにある
 
@@ -497,23 +415,12 @@ class YaneuraOuWorker: public Worker {
 	// Pointer to the search manager, only allowed to be called by the main thread
     // 検索マネージャへのポインタ。メインスレッドからのみ呼び出すことが許可されています。
 
-#if STOCKFISH
-    SearchManager* main_manager() const {
-        assert(threadIdx == 0);
-        return static_cast<SearchManager*>(manager.get());
-    }
-#else
     // 💡 Stockfishとの互換性のために用意。
     SearchManager* main_manager() const { return &manager; }
-#endif
 
 	// 時間経過。
 	// 💡 やねうら王では、SearchManagerがTimeManagement tmを持っていて、
 	//     このclassがelapsed()を持っているのでそちらを用いる。
-#if STOCKFISH
-    TimePoint elapsed() const;
-    TimePoint elapsed_time() const;
-#endif
 
 	// 評価関数
     Value evaluate(const Position& pos);
@@ -537,13 +444,6 @@ class YaneuraOuWorker: public Worker {
 	// 探索時に評価値に楽観的バイアスを与えるために用いるパラメーター。
 	Value optimism[COLOR_NB];
 
-#if STOCKFISH
-	// 探索開始局面とrootでのStateInfo
-	// 📝 やねうら王では、Engine classが持っている。
-    Position  rootPos;
-    StateInfo rootState;
-    RootMoves rootMoves;
-#endif
 
     // aspiration searchで使う。
     Depth rootDepth, completedDepth;
@@ -553,16 +453,6 @@ class YaneuraOuWorker: public Worker {
     // 次の反復深化でこのPV lineを辿っている間は、IIRとquiet shallow pruningを抑制する。
     PVMoves lastIterationPV;
 
-#if STOCKFISH
-	// 📓 やねうら王では、Engine classが持っている。
-	// threadIdx     : threadのindex(0からの連番), 0がmain thread
-	// numaThreadIdx : NUMA内のthread index。
-	// numaTotal     : NUMA内のtotal thread数。numaTotalThreads。
-	// 📑この3つはコンストラクタで渡されたもの
-
-	size_t                    threadIdx, numaThreadIdx, numaTotal;
-    NumaReplicatedAccessToken numaAccessToken;
-#endif
 
     // Reductions lookup table initialized at startup
     // 起動時に初期化されるreductionsの参照表
@@ -573,23 +463,6 @@ class YaneuraOuWorker: public Worker {
 	*/ 
     std::array<int, MAX_MOVES> reductions;  // [depth or moveNumber]
 
-#if STOCKFISH
-	// やねうら王では、これらは基底classであるWorkerが持っている。
-
-    // The main thread has a SearchManager, the others have a NullSearchManager
-    // メインスレッドは SearchManager を持ち、他のスレッドは NullSearchManager を持つ。
-    std::unique_ptr<ISearchManager> manager;
-
-    // 📝 tablebaseは将棋では使わない。
-    Tablebases::Config tbConfig;
-
-    const OptionsMap&                               options;
-    ThreadPool&                                     threads;
-    TranspositionTable&                             tt;
-	// TODO : あとで考える。
-    //const LazyNumaReplicatedSystemWide<Eval::NNUE::Networks>& networks;
-
-#endif
 
 	// 💡 やねうら王では、SearchManagerは、NullObject patternをやめて、単に参照で持つ。
     // 🤔 Stockfishも、main threadからしか呼び出さないのだから、これでいいと思うのだが…。
@@ -601,26 +474,7 @@ class YaneuraOuWorker: public Worker {
 
 	// NNUEの評価関数の計算用
 
-#if STOCKFISH
-	// TODO : あとでよく考える。
 
-	// NNUE評価関数のパラメーターがNumaごとにコピーされるようにする。
-	const LazyNumaReplicatedSystemWide<Eval::NNUE::Networks>& networks;
-
-	// Used by NNUE
-	// NNUEで使う
-
-	// NNUE評価関数のnetworkのL1層を保持しているstack
-    Eval::NNUE::AccumulatorStack  accumulatorStack;
-	// NNUE評価関数の差分計算用
-    Eval::NNUE::AccumulatorCaches refreshTable;
-#endif
-
-#if STOCKFISH
-    // 📝 こちらは、StockfishではThreadPool::get_best_thread()の実装のために必要。
-    //     やねうら王では、YaneuraOuWorkerでget_best_thread()を実装しているのでこのfriendは不要。
-    friend class Stockfish::ThreadPool;
-#else
 	// 🌈 以下、やねうら王独自追加 🌈
 
     // 並列探索において一番良い思考をしたthreadの選出。
@@ -640,7 +494,6 @@ class YaneuraOuWorker: public Worker {
     // Engine本体
 	// 📝 コンストラクタで受け取ったもの。
     YaneuraOuEngine& engine;
-#endif
 
 	friend class SearchManager;
 };

@@ -30,12 +30,7 @@ class TimeManagement {
     // optimum(),maximum(),minimum()に反映する。
 	// ⚠ optionsに"USI_Ponder"と"Stochastic_Ponder"オプションが含まれていること。
     void init(const Search::LimitsType& limits, Color us, int ply, const OptionsMap& options
-#if STOCKFISH
-			  , double& originalTimeAdjust
-    // 💡 やねうら王では使わないことにする。
-#else
 			  , int max_moves_to_draw
-#endif
     );
 
     TimePoint optimum() const;
@@ -45,12 +40,8 @@ class TimeManagement {
     // "go"からの経過時間を返す。
     template<typename FUNC>
     TimePoint elapsed(FUNC nodes) const {
-#if STOCKFISH
-        return useNodesTime ? TimePoint(nodes()) : elapsed_time();
-#else
         // 📝 やねうら王ではNodesTimeを使わないのでelapsed()はそのままelapsed_Time()に委譲しておく。
         return elapsed_time();
-#endif
     }
 
     // startTimeからの経過時間。
@@ -62,12 +53,6 @@ class TimeManagement {
     // 🌈　やねうら王では使わない。Stockfishとの互換性のために用意。
     void clear() {}
 
-#if STOCKFISH
-
-    void advance_nodes_time(std::int64_t nodes);
-    // 💡 やねうら王ではNodesTimeを使わない。
-
-#else
 
     // 📌 以下、やねうら王独自追加。
 
@@ -107,13 +92,8 @@ class TimeManagement {
 	//     よって、"go ponder"での思考でなくともこの変数は使える。
     TimePoint elapsed_time_from_ponderhit() const { return now() - ponderhitTime; };
 
-#endif
 
 
-#if STOCKFISH
-   private:
-    TimePoint startTime;      // 💡 探索開始時刻。LimitsType startTimeの値。
-#else
     bool      isFinalPush;    // 🌈 秒読みに突入しているので持ち時間を使い切るべきであるフラグ。
 							  //     つまりはponderhitTimeから数えてminimumTime分は使って欲しい。
     TimePoint startTime;      // 💡 探索開始時刻。LimitsType startTimeの値。
@@ -121,18 +101,10 @@ class TimeManagement {
                               //     "ponderhit"するまではstartTimeと同じ値。
    private:
     TimePoint minimumTime;  // 🌈 やねうら王独自追加。
-#endif
 
     TimePoint optimumTime;
     TimePoint maximumTime;
 
-#if STOCKFISH
-
-	std::int64_t availableNodes = -1;     // When in 'nodes as time' mode
-    bool         useNodesTime   = false;  // True if we are in 'nodes as time' mode
-    // 💡 やねうら王ではNodesTimeを使わない。
-
-#else
     // 📌 以下、やねうら王独自追加。
 
     // init()の内部実装。
@@ -158,7 +130,6 @@ class TimeManagement {
     OptionsMap*         lastcall_Opt;
 #endif
 
-#endif
 };
 
 }  // namespace YaneuraOu

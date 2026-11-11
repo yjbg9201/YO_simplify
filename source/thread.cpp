@@ -33,11 +33,7 @@ Thread::Thread(Search::SharedState& sharedState,
     stdThread(&Thread::idle_loop, this) {
 
 
-#if STOCKFISH
-	run_custom_job([this, &binder, &sharedState /*, &sm*/, n]() {
-#else
 	run_custom_job([this, &binder, &sharedState , n , worker_factory]() {
-#endif
 		// Use the binder to [maybe] bind the threads to a NUMA node before doing
         // the Worker allocation. Ideally we would also allocate the SearchManager
         // here, but that's minor.
@@ -46,14 +42,9 @@ Thread::Thread(Search::SharedState& sharedState,
         // 理想的にはここで SearchManager も割り当てたいが、それは些細なことだ。
 
         this->numaAccessToken = binder();
-#if STOCKFISH
-        this->worker = make_unique_large_page<Search::Worker>(
-          sharedState, std::move(sm), n, idxInNuma, totalNuma, this->numaAccessToken);
-#else
 		// 🌈 やねうら王では、ここでworker_factoryを使ってWorker派生classを生成する。
 		this->worker = std::move(worker_factory(sharedState,
 												{n, idxInNuma, totalNuma, this->numaAccessToken}));
-#endif
     });
 
     // スレッドはsearching == trueで開始するので、このままworkerのほう待機状態にさせておく
@@ -191,12 +182,8 @@ void ThreadPool::set(const NumaConfig&   numaConfig,
         boundThreadToNumaNode.clear();
     }
 
-#if STOCKFISH
-    const size_t requested = sharedState.options["Threads"];
-#else
     const size_t requested = requested_threads;
     // 🤔 やねうら王では、ここ、"Threads"の値を反映させたくない。(DL系などで、ここに柔軟性が必要)
-#endif
 
     if (requested > 0)  // create new thread(s)
     {
@@ -275,16 +262,6 @@ void ThreadPool::set(const NumaConfig&   numaConfig,
             const size_t    threadId      = threads.size();
             const NumaIndex numaId        = doBindThreads ? boundThreadToNumaNode[threadId] : 0;
             auto create_thread = [&]() {
-#if STOCKFISH
-                auto manager = threadId == 0
-                               ? std::unique_ptr<Search::ISearchManager>(
-                                   std::make_unique<Search::SearchManager>(updateContext))
-                               : std::make_unique<Search::NullSearchManager>();
-                // 💡 Stockfishのこの実装は、main threadのときだけSearchManagerを渡して、main thread以外のときは
-                //     SearchManagerを使わせない(NullSearchManagerを渡す)という意味。しかし、結局探索部からmain threadでしか
-                //     SearchManagerを呼び出さないので、このような設計にする必要はないと思う。
-                //     WorkerからSearchManagerにアクセスできればそれだけでいいので、やねうら王では上の設計は採用しない。
-#endif
 
                 // When not binding threads we want to force all access to happen
                 // from the same NUMA node, because in case of NUMA replicated memory
@@ -299,15 +276,9 @@ void ThreadPool::set(const NumaConfig&   numaConfig,
 
                 auto binder = doBindThreads ? OptionalThreadToNumaNodeBinder(numaConfig, numaId)
                                             : OptionalThreadToNumaNodeBinder(numaId);
-#if STOCKFISH
-                threads.emplace_back(std::make_unique<Thread>(sharedState, std::move(manager),
-                                                              threadId, counts[numaId]++,
-                                                              threadsPerNode[numaId], binder));
-#else
                 threads.emplace_back(std::make_unique<Thread>(sharedState, worker_factory, threadId,
                                                               counts[numaId]++,
                                                               threadsPerNode[numaId], binder));
-#endif
             };
 
             // Ensure the worker thread inherits the intended NUMA affinity at creation.
@@ -347,16 +318,6 @@ void ThreadPool::clear() {
 
 	// 🤔 これはEngine派生class側で行うべき。
 	//     ここにあったコードは、YaneuraOuEngine::clear()に移動させた。
-#if STOCKFISH
-	// These two affect the time taken on the first move of a game:
-	main_manager()->bestPreviousAverageScore = VALUE_INFINITE;
-	main_manager()->previousTimeReduction = 0.85;
-
-	main_manager()->callsCnt = 0;
-	main_manager()->bestPreviousScore = VALUE_INFINITE;
-	main_manager()->originalTimeAdjust = -1;
-	main_manager()->tm.clear();
-#endif
 }
 
 void ThreadPool::run_on_thread(size_t threadId, std::function<void()> f) {
@@ -389,33 +350,9 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     //     ここのある初期化のうち、stopとabortedSearch以外は、Worker派生classで処理すべき。
     // 🌈 SearchManager::pre_start_searching()に移動させた。
 	//     これは、Workerの派生classのpre_start_searching()から呼び出される。
-#if STOCKFISH
-    main_manager()->stopOnPonderhit = stop = abortedSearch = false;
-    main_manager()->ponder                                 = limits.ponderMode;
-    increaseDepth                                          = true;
-#else
     stop = abortedSearch = false;
-#endif
 
     Search::RootMoves rootMoves;
-#if STOCKFISH
-    const auto legalmoves = MoveList<LEGAL_ALL>(pos);
-
-    for (const auto& usiMove : limits.searchmoves)
-    {
-        auto move = USIEngine::to_move(pos, usiMove);
-
-        if (std::find(legalmoves.begin(), legalmoves.end(), move) != legalmoves.end())
-            rootMoves.emplace_back(move);
-    }
-
-    // limits.searchmovesが指定されていないとき、rootMovesがemptyになる。
-    // このとき、すべての合法手でスタートする必要がある。
-    if (rootMoves.empty())
-        for (const auto& m : legalmoves)
-            rootMoves.emplace_back(m);
-
-#else
 
     // 🌈  GenerateAllLegalMoves反映させないと..
     bool generate_all_legal_moves =
@@ -447,7 +384,6 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
         setup_rootMoves(legalmoves);
     }
 
-#endif
 
     //Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
     // ⇨  Tablebasesは将棋では用いないのでコメントアウト
@@ -477,41 +413,20 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     for (auto&& th : threads)
     {
         th->run_custom_job([&]() {
-#if STOCKFISH
-            th->worker->limits = limits;
-            th->worker->nodes = th->worker->tbHits = th->worker->bestMoveChanges = 0;
-            th->worker->nmpMinPly                                                = 0;
-            th->worker->rootDepth = th->worker->completedDepth = 0;
-            th->worker->rootMoves                              = rootMoves;
-            th->worker->rootPos.set(pos.fen(), pos.is_chess960(), &th->worker->rootState);
-            th->worker->rootState = setupStates->back();
-            th->worker->tbConfig  = tbConfig;
-#else
 
             th->worker->limits = limits;
             th->worker->nodes  = 0;
-#endif
 
 			// 📝 tbHits、tbConfigは将棋では使わない。
 
-#if STOCKFISH
-            th->worker->nmpMinPly = 0;
-			th->worker->bestMoveChanges = 0;
-            th->worker->rootDepth = th->worker->completedDepth = 0;
-
-            // 🤔 やねうら王では、Worker派生classのpre_start_searching()で行うようにする。
-            //     やねうら王では、void Search::YaneuraOuWorker::pre_start_searching()で行っている。
-#endif
 
             th->worker->rootMoves = rootMoves;
             th->worker->rootPos.set(pos.sfen(), &th->worker->rootState);
             th->worker->rootState = setupStates->back();
 
-#if !STOCKFISH
 			// ⚠ どうせなら、↑でworker->rootPos.set()が終わってから呼び出したい。
 			//     (rootPosを使って入玉判定などを行いたいため)
             th->worker->pre_start_searching();
-#endif
 		});
     }
 

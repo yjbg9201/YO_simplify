@@ -14,13 +14,11 @@ namespace YaneuraOu {
 
 using namespace BB_Table;
 
-#if !STOCKFISH
 std::ostream& operator<<(std::ostream& os, ExtMove m)
 {
     os << Move(m) << '(' << m.value << ')';
     return os;
 }
-#endif
 
 // mlist_startからmlist_endまで(mlist_endは含まない)の指し手がpseudo_legal_s<true>であるかを
 // 調べて、すべてがそうであるならばtrueを返す。

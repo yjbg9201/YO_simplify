@@ -54,14 +54,8 @@ void TimeManagement::init(const Search::LimitsType& limits,
                           Color               us,
                           int                 ply,
                           const OptionsMap&   options
-#if STOCKFISH
-                          ,
-                          double& originalTimeAdjust
-// 💡 やねうら王では使わないことにする。
-#else
                           ,
                           int max_moves_to_draw
-#endif
 
 ) {
 
@@ -90,45 +84,6 @@ void TimeManagement::init_(const Search::LimitsType& limits,
                            int                 ply,
                            const OptionsMap&   options, int max_moves_to_draw) {
 
-#if STOCKFISH
-	TimePoint npmsec = TimePoint(options["nodestime"]);
-	// nodes as timeモード。やねうら王では用いない。
-
-    // If we have no time, we don't need to fully initialize TM.
-    // startTime is used by movetime and useNodesTime is used in elapsed calls.
-    startTime    = limits.startTime;
-
-	useNodesTime = npmsec != 0;
-
-    if (limits.time[us] == 0)
-        return;
-
-	TimePoint npmsec = Options["nodestime"];
-
-	// npmsecがUSI optionで指定されていれば、時間の代わりに、ここで指定されたnode数をベースに思考を行なう。
-	// nodes per millisecondの意味。
-	// nodes as timeモードで対局しなければならないなら、時間をノード数に変換して、
-	// 持ち時間制御の計算式では、この結果の値を用いる。
-	if (npmsec)
-	{
-		// ゲーム開始時に1回だけ
-		if (!availableNodes)
-			availableNodes = npmsec * limits.time[us];
-		
-		// ミリ秒をnode数に変換する
-		limits.time[us] = TimePoint(availableNodes);
-		for (auto c : COLOR)
-		{
-			limits.inc[c] *= npmsec;
-			limits.byoyomi[c] *= npmsec;
-		}
-		limits.rtime *= npmsec;
-		limits.npmsec = npmsec;
-
-		// NetworkDelay , MinimumThinkingTimeなどもすべてnpmsecを掛け算しないといけないな…。
-		// 1000で繰り上げる必要もあるしなー。これtime managementと極めて相性が悪いのでは。
-	}
-#endif
 
 	// ネットワークのDelayを考慮して少し減らすべき。
 	// かつ、minimumとmaximumは端数をなくすべき

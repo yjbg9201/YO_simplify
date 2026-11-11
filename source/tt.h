@@ -155,12 +155,7 @@ public:
 	//
 	// ⇨ このprobe()でTTの内部状態が変更されないことは保証されている。(されるようになった)
 
-#if STOCKFISH
-    std::tuple<bool, TTData, TTWriter> probe(
-          const Key key) const;  // The main method, whose retvals separate local vs global objects
-#else
 	std::tuple<bool, TTData, TTWriter> probe(const Key key, const Position& pos) const;
-#endif
 
 	// The hash function; its only external use is memory prefetching
 	// ハッシュ関数です。外部での唯一の使用目的はメモリのプリフェッチです。
@@ -179,12 +174,7 @@ public:
 		必要になって嫌だからである。
 	*/ 
 
-#if STOCKFISH
-    TTEntry* first_entry(const Key key)
-      const;  // This is the hash function; its only external use is memory prefetching.
-#else
 	TTEntry* first_entry(const Key& key, Color side_to_move) const;
-#endif
 
 private:
 	friend struct TTEntry;

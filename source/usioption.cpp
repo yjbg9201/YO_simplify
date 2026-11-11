@@ -47,16 +47,12 @@ void OptionsMap::setoption(std::istringstream& is) {
 // これはread onlyで、設定はここからしてはならない。
 const Option& OptionsMap::operator[](const std::string& name) const {
 	auto it = options_map.find(name);
-#if STOCKFISH
-	assert(it != options_map.end());
-#else
 	if (it == options_map.end())
 	{
 		// Optionを生やす前に参照したのだと思うので、エラーメッセージを出力して終了する。
 		sync_cout << "Error : Options[" << name << "] , not found." << sync_endl;
 		Tools::exit();
 	}
-#endif
 
 	return it->second;
 }
@@ -115,11 +111,7 @@ Option::Option(OnChange f) :
 	on_change(std::move(f)) {
 }
 
-#if STOCKFISH
-Option::Option(int v, int minv, int maxv, OnChange f) :
-#else
 Option::Option(int64_t v, int64_t minv, int64_t maxv, OnChange f) :
-#endif
 	type("spin"),
 	min(minv),
 	max(maxv),
@@ -127,17 +119,6 @@ Option::Option(int64_t v, int64_t minv, int64_t maxv, OnChange f) :
 	defaultValue = currentValue = std::to_string(v);
 }
 
-#if STOCKFISH
-
-Option::Option(const char* v, const char* cur, OnChange f) :
-	type("combo"),
-	min(0),
-	max(0),
-	on_change(std::move(f)) {
-	defaultValue = v;
-	currentValue = cur;
-}
-#else
 
 // 🤔 Stockfishのcombo optionの設定、すごく使いにくいので定義しなおす。
 Option::Option(const std::vector<std::string>& list, const std::string& cur, OnChange f) :
@@ -157,23 +138,14 @@ Option::Option(const std::vector<std::string>& list, const std::string& cur, OnC
     defaultValue = s;
 	currentValue = cur;
 }
-#endif
 
 Option::operator int64_t() const {
 	ASSERT_LV1(type == "check" || type == "spin");
-#if STOCKFISH
-	return (type == "spin" ? std::stoi(currentValue) : currentValue == "true");
-#else
 	return (type == "spin" ? std::stoll(currentValue) : currentValue == "true");
-#endif
 }
 
 Option::operator std::string() const {
-#if STOCKFISH
-    assert(type == "string");
-#else
 	ASSERT_LV1(type == "string" || type == "combo");
-#endif
 	return currentValue;
 }
 
@@ -195,25 +167,17 @@ bool Option::operator!=(const char* s) const { return !(*this == s); }
 
 Option& Option::operator=(const std::string& v) {
 
-#if STOCKFISH
-    assert(!type.empty());
-#else
 	ASSERT_LV1(!type.empty());
 
 	// fixedになっていれば代入をキャンセル
 	if (fixed)
 		return *this;
-#endif
 
 	// 範囲外なら設定せずに返る。
 	// "EvalDir"などでstringの場合は空の文字列を設定したいことがあるので"string"に対して空の文字チェックは行わない。
 	if ((type != "button" && type != "string" && v.empty())
 		|| (type == "check" && v != "true" && v != "false")
-#if STOCKFISH
-		|| (type == "spin" && (std::stoi(v) < min || std::stoi(v) > max)))
-#else
 		|| (type == "spin" && (std::stoll(v) < min || std::stoll(v) > max)))
-#endif
 		return *this;
 
 	if (type == "combo")
@@ -223,14 +187,6 @@ Option& Option::operator=(const std::string& v) {
 		std::string        token;
 		std::istringstream ss(defaultValue);
 		// defaultValueにスペース区切りで書かれているのでこれをparseする。
-#if STOCKFISH
-		while (ss >> token)
-			comboMap.add(token, Option());
-		if (!comboMap.count(v) || v == "var")
-			// defaultValueのなかに見つからなかったのでリタイア
-			// "var"が見つかってもこれは見つかったことにはしない。
-			return *this;
-#else
         while (ss >> token)
 			// 📝 USIではvarは複数回出てくることがある。そこでこの時点で除外する。
 			//     同じ値がdefulat値と選択肢との両方に出てくることもある。これも除外する。
@@ -244,7 +200,6 @@ Option& Option::operator=(const std::string& v) {
                       << "`, values = " << defaultValue << sync_endl;
             return *this;
         }
-#endif
 	}
 
 	if (type == "string")
@@ -289,11 +244,7 @@ std::ostream& operator<<(std::ostream& os, const OptionsMap& om) {
 				}
 
 				else if (o.type == "spin")
-#if STOCKFISH
-                    os << " default " << stoi(o.defaultValue) << " min " << o.min << " max "
-#else
 					os << " default " << stoll(o.defaultValue) << " min " << o.min << " max "
-#endif
 					<< o.max;
 
 				break;
