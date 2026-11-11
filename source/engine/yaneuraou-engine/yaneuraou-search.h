@@ -3,7 +3,6 @@
 
 #include "../../config.h"
 
-#if defined (YANEURAOU_ENGINE)
 
 #include "../../engine.h"
 #include "../../search.h"
@@ -663,5 +662,4 @@ struct ConthistBonus {
 
 } // namespace YaneuraOu
 
-#endif // defined(YANEURAOU_ENGINE)
 #endif // YANEURAOU_SEARCH_H_INCLUDED

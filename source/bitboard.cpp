@@ -499,9 +499,7 @@ void Bitboards::init()
 #endif
 
 	// 10. 1手詰めテーブルの初期化
-#if defined (USE_MATE_1PLY)
 	Mate::init();
-#endif
 
 }
 

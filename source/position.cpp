@@ -11,9 +11,7 @@
 #include "movegen.h"
 #include "testcmd/unit_test.h"
 
-#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_NNUE)
 #include "eval/evaluate_common.h"
-#endif
 
 using namespace std;
 namespace YaneuraOu {
@@ -69,10 +67,8 @@ Key psq[PIECE_NB][SQ_NB_PLUS1];
 // 枚数ごとにhash keyのtableを用意するのは嫌なので、加算型にしてある。
 Key hand[COLOR_NB][PIECE_HAND_NB];
 
-#if defined(USE_PARTIAL_KEY)
 // 歩の陣形に関して盤上に歩が一枚もない時のhash key
 Key noPawns;
-#endif
 
 #endif
 };
@@ -97,9 +93,7 @@ void Position::init() {
 
 	set_rand(Zobrist::side);
 
-#if defined(USE_PARTIAL_KEY)
     set_rand(Zobrist::noPawns);
-#endif
 
 	// 64bit hash keyは256bit hash keyの下位64bitという解釈をすることで、256bitと64bitのときとでhash keyの下位64bitは合致するようにしておく。
 	// これは定跡DBなどで使うときにこの性質が欲しいからである。
@@ -124,7 +118,6 @@ void Position::init() {
 
 namespace {
 inline void xor_piece_for_partial_key(StateInfo* st, Piece pc, Square s) {
-#if defined(USE_PARTIAL_KEY)
     /*
 		🤔 手駒も含めたPARTIAL KEYにしたほうがいいかも知れないが、
 			手駒は足し算にしているので、それに対応するのは容易ではない。
@@ -146,22 +139,17 @@ inline void xor_piece_for_partial_key(StateInfo* st, Piece pc, Square s) {
 
         st->nonPawnKey[color_of(pc)] ^= Zobrist::psq[pc][s];
     }
-#endif
 }
 
 inline void put_piece_for_partial_key(StateInfo* st, Piece pc, Square s) {
-#if defined(USE_PARTIAL_KEY)
     xor_piece_for_partial_key(st, pc, s);
     // 🌈 materialKeyは足し算にする。これで、pieceCount()が不要になる。
     st->materialKey += Zobrist::psq[pc][8];
-#endif
 }
 
 inline void remove_piece_for_partial_key(StateInfo* st, Piece pc, Square s) {
-#if defined(USE_PARTIAL_KEY)
     xor_piece_for_partial_key(st, pc, s);
     st->materialKey -= Zobrist::psq[pc][8];
-#endif
 }
 } // namespace
 
@@ -314,14 +302,12 @@ void Position::set_state() const {
     st->board_key = Zobrist::zero;
     st->hand_key  = Zobrist::zero;
 
-#if defined(USE_PARTIAL_KEY)
 
     st->materialKey       = Zobrist::zero;
     st->minorPieceKey     = Zobrist::zero;
     st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = Zobrist::zero;
     st->pawnKey                                   = Zobrist::noPawns;
 
-#endif
     // 歩以外の駒の価値。やねうら王では使っていない。
     // st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
 
@@ -451,7 +437,6 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
     bool    promote = false;
     size_t  idx;
 
-#if defined(USE_EVAL_LIST)
     // evalListのclear。上でmemsetでゼロクリアしたときにクリアされているが…。
     evalList.clear();
 
@@ -463,7 +448,6 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
 
     // 先手玉のいない詰将棋とか、駒落ちに対応させるために、存在しない駒はすべてBONA_PIECE_ZEROにいることにする。
     // 上のevalList.clear()で、ゼロクリアしているので、それは達成しているはず。
-#endif
 
     kingSquare[BLACK] = kingSquare[WHITE] = SQ_NB;
 
@@ -527,13 +511,11 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
             }
             put_piece(pc, sq);
 
-#if defined(USE_EVAL_LIST)
             PieceNumber piece_no = (idx == B_KING) ? PIECE_NUMBER_BKING :  // 先手玉
                                      (idx == W_KING) ? PIECE_NUMBER_WKING
                                                      :                           // 後手玉
                                      piece_no_count[raw_type_of(Piece(idx))]++;  // それ以外
             evalList.put_piece(piece_no, sq, pc);  // sqの升にpcの駒を配置する
-#endif
 
             // 1升進める
             --f;
@@ -613,11 +595,9 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
 				// 手駒を1枚増やす。
                 put_hand_piece(color_of(pc), rpc);
 
-#if defined(USE_EVAL_LIST)
                 PieceNumber piece_no = piece_no_count[rpc]++;
                 ASSERT_LV1(is_ok(piece_no));
                 evalList.put_piece(piece_no, color_of(pc), rpc, i);
-#endif
             }
             ct = 0;
         }
@@ -727,13 +707,9 @@ std::optional<PositionSetError> Position::set(const std::string& sfen, StateInfo
 
     // --- evaluate
 
-#if defined(USE_PIECE_VALUE)
     st->materialValue = Eval::material(*this);
-#endif
 
-#if defined(USE_CLASSIC_EVAL)
     Eval::compute_eval(*this);
-#endif
 
     // --- validation
 
@@ -1725,15 +1701,9 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
 
     // 評価値の差分計算用の初期化
-#if defined(USE_CLASSIC_EVAL)
 
-#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
-    st->sum.p[0][0] = VALUE_NOT_EVALUATED;
-#endif
-#if defined(EVAL_NNUE)
     st->accumulator.computed_accumulation = false;
     st->accumulator.computed_score        = false;
-#endif
 
 #if defined(USE_BOARD_EFFECT_PREV)
     // NNUE-HalfKPE9
@@ -1748,7 +1718,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
     st->lastMovedPieceType = m.is_drop() ? PieceType(m.from_sq()) : type_of(piece_on(m.from_sq()));
 #endif
 
-#endif
 
     // ----------------------
     //    盤面の更新処理
@@ -1807,17 +1776,11 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 
 #endif
 
-#if defined(USE_PIECE_VALUE)
     // 駒割りの差分計算用
     int materialDiff;
-#endif
 
-#if defined(USE_CLASSIC_EVAL)
 
-#if defined(USE_EVAL_LIST)
     auto& dp = st->dirtyPiece;
-#endif
-#endif
 
     if (m.is_drop())
     {
@@ -1842,17 +1805,11 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
             prefetch(tt->first_entry(key, them));
         }
 
-#if defined(USE_PARTIAL_KEY) & 0
-        // 打ち歩なら、pawnKeyの更新が必要
-        if (pr == PAWN)
-            st->pawnKey ^= Zobrist::psq[pc][to];
-#endif
 
         put_piece(pc, to);
         put_piece_for_partial_key(st, pc, to);
 
         // 打駒した駒に関するevalListの更新。
-#if defined(USE_EVAL_LIST)
         PieceNumber piece_no = piece_no_of(Us, pr);
         ASSERT_LV3(is_ok(piece_no));
 
@@ -1862,7 +1819,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
         dp.changed_piece[0].old_piece = evalList.bona_piece(piece_no);
         evalList.put_piece(piece_no, to, pc);
         dp.changed_piece[0].new_piece = evalList.bona_piece(piece_no);
-#endif
 
         // ⚠ piece_no_of()のときに、いまの手駒の枚数を参照するので↑のあとで更新する必要がある。
         remove_hand_piece(Us, pr);
@@ -1887,10 +1843,8 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
         // put_piece()などを用いたのでupdateする
         update_bitboards();
 
-#if defined(USE_PIECE_VALUE)
         // 駒打ちなので駒割りの変動なし。
         materialDiff = 0;
-#endif
 
 #if defined(LONG_EFFECT_LIBRARY)
         // 駒打ちによる利きの更新処理
@@ -1912,9 +1866,7 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
         // もし成る指し手であるなら、成った後の駒を配置する。
         Piece moved_after_pc = moved_piece_after(m);
 
-#if defined(USE_PIECE_VALUE)
         materialDiff = m.is_promote() ? Eval::ProDiffPieceValue[moved_pc] : 0;
-#endif
         // 📌 ここから下はStockfishのdo_move()のコードの一部 📌
 
 		// 駒を取るのか？
@@ -1934,7 +1886,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 			PieceType pr = raw_type_of(captured);
 
             // 捕獲した駒に関するevalListの更新
-#if defined(USE_EVAL_LIST)
 			// このPieceNumberの駒が手駒に移動したのでEvalListのほうを更新しておく。
 			PieceNumber piece_no = piece_no_of(to);
 			ASSERT_LV3(is_ok(piece_no));
@@ -1943,7 +1894,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
 			dp.changed_piece[1].old_piece = evalList.bona_piece(piece_no);
 			evalList.put_piece(piece_no, Us, pr, hand_count(hand[Us], pr));
 			dp.changed_piece[1].new_piece = evalList.bona_piece(piece_no);
-#endif
 
             // 駒取りなら現在の手番側の駒が増える。
             // ⚠ piece_no_of()で手駒の枚数を参照するので
@@ -1966,10 +1916,8 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
             h += Zobrist::hand[Us][pr];
 #endif
 
-#if defined(USE_PIECE_VALUE)
             // 評価関数で使う駒割りの値も更新
             materialDiff += Eval::CapturePieceValue[captured];
-#endif
 
 			// 捕獲した駒をStateInfoに保存しておく。(undo_moveのため)
             st->capturedPiece = captured;
@@ -1984,9 +1932,7 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
             // 移動先で駒を捕獲しないときの利きの更新
             LongEffect::update_by_no_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc);
 #endif
-#if defined(USE_EVAL_LIST)
             dp.dirty_num = 1;  // 動いた駒は1個
-#endif
         }
 
         // fromにあったmoved_pcがtoにmoved_after_pcとして移動した。
@@ -2001,12 +1947,10 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
             prefetch(tt->first_entry(key, them));
         }
 
-#if defined(USE_EVAL_LIST)
         // 移動元にあった駒のpiece_noを得る
         PieceNumber piece_no2         = piece_no_of(from);
         dp.pieceNo[0]                 = piece_no2;
         dp.changed_piece[0].old_piece = evalList.bona_piece(piece_no2);
-#endif
 
         // 移動元の升からの駒の除去
         remove_piece(from);
@@ -2016,10 +1960,8 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
         put_piece(moved_after_pc, to);
         put_piece_for_partial_key(st, moved_after_pc, to);
 
-#if defined(USE_EVAL_LIST)
         evalList.put_piece(piece_no2, to, moved_after_pc);
         dp.changed_piece[0].new_piece = evalList.bona_piece(piece_no2);
-#endif
 
         // 王を移動させる手であるなら、kingSquareを更新しておく。
         // ⚠ これを更新しておかないとsquare<KING>()が使えなくなってしまう。
@@ -2090,11 +2032,9 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
     //st->continuousCheck[them] = prev->continuousCheck[them];
     // 💡 memcpy()するので自動的にそうなっている。
 
-#if defined(USE_PIECE_VALUE)
     st->materialValue =
       (Value) (st->previous->materialValue + (Us == BLACK ? materialDiff : -materialDiff));
     //ASSERT_LV5(st->materialValue == Eval::material(*this));
-#endif
 
     // 相手番に変更する。
     sideToMove = them;
@@ -2282,10 +2222,8 @@ void Position::undo_move_impl(Move m) {
 
     Piece moved_after_pc = moved_piece_after(m);
 
-#if defined(USE_EVAL_LIST)
     PieceNumber piece_no = piece_no_of(to);  // 移動元のpiece_no == いまtoの場所にある駒のpiece_no
     ASSERT_LV3(is_ok(piece_no));
-#endif
 
     // 移動前の駒
     // Piece moved_pc = is_promote(m) ? (moved_after_pc - PIECE_PROMOTE) : moved_after_pc;
@@ -2302,9 +2240,7 @@ void Position::undo_move_impl(Move m) {
         // toの場所にある駒を手駒に戻す
         PieceType pt = raw_type_of(moved_after_pc);
 
-#if defined(USE_EVAL_LIST)
         evalList.put_piece(piece_no, Us, pt, hand_count(hand[Us], pt));
-#endif
 		// 手駒が増える
         put_hand_piece(Us, pt);
 
@@ -2338,7 +2274,6 @@ void Position::undo_move_impl(Move m) {
             put_piece(to_pc, to);
             put_piece(moved_pc, from);
 
-#if defined(USE_EVAL_LIST)
             PieceNumber piece_no2 =
               piece_no_of(Us, raw_type_of(to_pc));  // 捕っていた駒(手駒にある)のpiece_no
             ASSERT_LV3(is_ok(piece_no2));
@@ -2352,10 +2287,6 @@ void Position::undo_move_impl(Move m) {
             // moved_pcが玉であることはあるが、いまkingSquareを更新してしまうと
             // rewind_by_capturing_piece()でその位置を用いているのでまずい。(かも)
             evalList.put_piece(piece_no, from, moved_pc);
-#else
-            // 手駒から減らす
-            remove_hand_piece(Us, raw_type_of(to_pc));
-#endif
 
 #if defined(LONG_EFFECT_LIBRARY)
             // 移動先で駒を捕獲するときの利きの更新
@@ -2368,10 +2299,8 @@ void Position::undo_move_impl(Move m) {
 
             put_piece(moved_pc, from);
 
-#if defined(USE_EVAL_LIST)
             // 成りの指し手だったなら非成りの駒がfromの場所に戻る。さもなくばそのまま戻る。
             evalList.put_piece(piece_no, from, moved_pc);
-#endif
 
 #if defined(LONG_EFFECT_LIBRARY)
             // 移動先で駒を捕獲しないときの利きの更新
@@ -2459,10 +2388,8 @@ void Position::do_null_move(StateInfo& newSt, const T& tt) {
 
 #else
 
-#if defined(USE_CLASSIC_EVAL) && defined(EVAL_NNUE)
     // NNUEの場合、KPPT型と違って、手番が違う場合、計算なしに済ますわけにはいかない。
     st->accumulator.computed_score = false;
-#endif
 
 	// このタイミングでアドレスが確定するのでprefetchしたほうが良い。(かも)
     // →　将棋では評価関数の計算時のメモリ帯域がボトルネックになって、ここでprefetchしても
@@ -2525,7 +2452,6 @@ void Position::undo_null_move()
 }
 
 
-#if defined (USE_SEE)
 
 // Tests if the SEE (Static Exchange Evaluation)
 // value of move is greater or equal to the given threshold. We'll use an
@@ -2808,7 +2734,6 @@ bool Position::see_ge(Move m, Value threshold) const
     return bool(res);
 }
 
-#endif // defined (USE_SEE)
 
 // ----------------------------------
 //      千日手判定
@@ -3683,7 +3608,6 @@ void Position::UnitTest(Test::UnitTester& tester, IEngine& engine) {
             tester.test("bishop's unpromoted move", all);
         }
     }
-#if defined(USE_SEE)
     {
         // see_ge()のテスト
         auto      section = tester.section("see_ge");
@@ -3731,7 +3655,6 @@ void Position::UnitTest(Test::UnitTester& tester, IEngine& engine) {
         m = pos.to_move(make_move16(SQ_22, SQ_33));
         tester.test("pos2move", see_ge_th(-Eval::HorseValue));
     }
-#endif
 
     {
         // null moveのテスト
@@ -3794,7 +3717,6 @@ void Position::UnitTest(Test::UnitTester& tester, IEngine& engine) {
         tester.test("handicapped sfen", success);
     }
 
-#if defined(USE_PARTIAL_KEY)
     {
         // 部分hashkeyのテスト
         auto section = tester.section("PartialKey");
@@ -3846,7 +3768,6 @@ void Position::UnitTest(Test::UnitTester& tester, IEngine& engine) {
             tester.test("partial hash key", ok);
         }
     }
-#endif
 
     {
         // それ以外のテスト

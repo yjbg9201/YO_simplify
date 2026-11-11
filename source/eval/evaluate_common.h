@@ -3,25 +3,12 @@
 
 // いまどきの手番つき評価関数(EVAL_KPPTとEVAL_KPP_KKPT)の共用header的なもの。
 
-#if defined (EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_NNUE)
 #include <functional>
 
 namespace YaneuraOu {
 namespace Eval
 {
 
-#if defined (EVAL_KPPT) || defined(EVAL_KPP_KKPT) 
-
-	// KKファイル名
-	constexpr const char* KK_BIN = "KK_synthesized.bin";
-
-	// KKPファイル名
-	constexpr const char* KKP_BIN = "KKP_synthesized.bin";
-
-	// KPPファイル名
-	constexpr const char* KPP_BIN = "KPP_synthesized.bin";
-
-#endif
 
 #if defined(USE_EVAL_HASH)
 	// prefetchする関数
@@ -42,6 +29,5 @@ namespace Eval
 } // Eval
 } // namespace YaneuraOu
 
-#endif
 
 #endif // _EVALUATE_KPPT_COMMON_H_

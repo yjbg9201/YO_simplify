@@ -6,7 +6,6 @@
 
 #include "../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "nnue_feature_transformer.h"
 #include "nnue_architecture.h"
@@ -173,6 +172,5 @@ struct std::hash<YaneuraOu::Eval::NNUE::NnueNetworks> {
 	}
 };
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // #ifndef NNUE_EVALUATE_NNUE_H_INCLUDED

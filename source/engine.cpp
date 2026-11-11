@@ -28,13 +28,6 @@ Engine::Engine() :
 	threads()
 {
 
-#if !defined(USE_CLASSIC_EVAL)
-	// 局面は平手の開始局面にしておく。
-	pos.set(StartSFEN, &states->back());
-	// ⚠ CLASSIC EVALは、Position::set()の途中でcompute_eval()を呼び出すので
-	//     その時に評価関数の初期化がなされるが、その時点では評価関数の読み込みが
-	//     完了していないので、アクセス違反で落ちる。
-#endif
 
 	//resize_threads();
 	// ⚠ スレッドは置換表のクリアなどで必要になるので、

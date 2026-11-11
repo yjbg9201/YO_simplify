@@ -2,7 +2,6 @@
 #define MATE_H_INCLUDED
 
 #include "../types.h"
-#if defined (USE_MATE_1PLY)
 
 #include <vector>
 #include <memory> // std::unique_ptr<>
@@ -373,6 +372,5 @@ namespace Mate::Dfpn
 #endif // defined(USE_MATE_DFPN)
 
 } // namespace YaneuraOu
-#endif // defined (USE_MATE_1PLY)
 
 #endif // MATE_H_INCLUDED

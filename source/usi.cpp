@@ -110,9 +110,7 @@ void USIEngine::set_engine(IEngine& _engine) {
     //     期待するコードになっているので呼び出して初期化してやる。
     //     また、その時にエンジンオプションを追加する。
 
-#if defined(USE_CLASSIC_EVAL)
     Eval::add_options(engine.get_options(), engine.get_threads());
-#endif
 
 	// optionの値が変更された時に、その結果文字列を出力するためのhandlerを設定してやる。
     engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
@@ -1699,17 +1697,7 @@ void USIEngine::isready()
 
 	// スレッドを先に生成しないとUSI_Hashで確保したメモリクリアの並列化が行われなくて困る。
 
-#if defined(YANEURAOU_ENGINE_DEEP)
-
-	// ここ、max_gpu == 8固定として扱っている。あとで修正する。(かも)
-	int threads_num =
-		(int)Options["UCT_Threads1"] + (int)Options["UCT_Threads2"] + (int)Options["UCT_Threads3"] + (int)Options["UCT_Threads4"] +
-		(int)Options["UCT_Threads5"] + (int)Options["UCT_Threads6"] + (int)Options["UCT_Threads7"] + (int)Options["UCT_Threads8"];
-
-	Threads.set(std::max(threads_num,1));
-#else
 	//Threads.set(size_t(options["Threads"]));
-#endif
 
 #if defined (USE_EVAL_HASH)
 	Eval::EvalHash_Resize(Options["EvalHash"]);
@@ -1721,28 +1709,15 @@ void USIEngine::isready()
 #if 0
 	// 評価関数の読み込み
 
-#if defined(YANEURAOU_ENGINE_DEEP)
-
-	// 毎回、load_eval()は呼び出すものとする。
-	// モデルファイル名に変更がなければ、再読み込みされないような作りになっているならばこの実装のほうがシンプル。
-	Eval::load_eval();
-	engine.engine.eval_loaded = true;
-
-#else
 
 	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
 	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
 	engine.verify_networks();
-#endif
 
 	// isreadyに対してはreadyokを返すまで次のコマンドが来ないことは約束されているので
 	// このタイミングで各種変数の初期化もしておく。
 
-#if defined(YANEURAOU_ENGINE_DEEP)
-	// ふかうら王では置換表は用いない。
-#else
 	//TT.resize(size_t(options["USI_Hash"]));
-#endif
 
 	//Search::clear();
 

@@ -1,5 +1,4 @@
 ﻿#include "mate.h"
-#if defined (USE_MATE_1PLY)
 #include "../position.h"
 #include "../movegen.h"
 
@@ -441,4 +440,3 @@ void MateDfpnSolver::ChangeSolverType(DfpnSolverType t) {
 
 #endif // defined(USE_MATE_DFPN)
 
-#endif // defined (USE_MATE_1PLY)

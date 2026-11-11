@@ -72,9 +72,6 @@ namespace Mate {
 			// それぞれの指し手に対して点数をつける。
 			if (MoveOrdering)
 			{
-#if !defined (USE_PIECE_VALUE)
-				std::cout << "Error! : define USE_PIECE_VALUE" << std::endl;
-#endif
 
 				// 現在の駒割りに、captureする指し手に対してcaptureする駒を加点して、
 				// あと、駒の移動先の升が受け方の玉から近いかに対して加点して、その指し手の価値として返す。

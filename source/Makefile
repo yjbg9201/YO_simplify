@@ -150,12 +150,6 @@ CPPFLAGS += $(EXTRA_CPPFLAGS)
 LDFLAGS  += $(EXTRA_LDFLAGS)
 COMPILER_MACHINE := $(shell $(COMPILER) -dumpmachine 2>/dev/null)
 
-# YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIALのときに指定できる、評価関数の通し番号
-#  1 : 普通の駒得のみの評価関数
-#  2 : …
-# cf.【連載】評価関数を作ってみよう！その1 : http://yaneuraou.yaneu.com/2020/11/17/make-evaluate-function/
-MATERIAL_LEVEL = 1
-
 # NNUE評価関数を実行ファイルに内蔵する。 ビルドするときにsourceフォルダ直下に"nn.bin"を配置する。
 EVAL_EMBEDDING = OFF
 # EVAL_EMBEDDING = ON
@@ -341,7 +335,6 @@ SOURCES  = \
 	eval/evaluate.cpp                                                          \
 	eval/evaluate_io.cpp                                                       \
 	eval/evaluate_mir_inv_tools.cpp                                            \
-	eval/material/evaluate_material.cpp                                        \
 	testcmd/unit_test.cpp                                                      \
 	testcmd/mate_test_cmd.cpp                                                  \
 	testcmd/normal_test_cmd.cpp                                                
@@ -354,80 +347,6 @@ ifeq (,)
 	SOURCES  +=                                                                \
 		book/makebook.cpp                                                      \
 		book/makebook2025.cpp
-endif
-
-ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
-	SOURCES  +=                                                                \
-		eval/kppt/evaluate_kppt.cpp                                            \
-		engine/yaneuraou-engine/yaneuraou-search.cpp
-endif
-
-ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPP_KKPT)
-	SOURCES  +=                                                                \
-		eval/kppt/evaluate_kppt.cpp                                            \
-		eval/kpp_kkpt/evaluate_kpp_kkpt.cpp                                    \
-		engine/yaneuraou-engine/yaneuraou-search.cpp
-endif
-
-ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_MATERIAL)
-	SOURCES  +=                                                                \
-		engine/yaneuraou-engine/yaneuraou-search.cpp
-
-	CPPFLAGS += -DMATERIAL_LEVEL=$(MATERIAL_LEVEL)
-endif
-
-ifneq (,$(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)))
-	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP)
-	else
-		# YANEURAOU_EDITIONがYANEURAOU_ENGINE_DEEPの後ろに文字が入っている名前なら、
-		# とりあえず"YANEURAOU_ENGINE_DEEP"というシンボルを定義してやる。
-		CPPFLAGS += -DYANEURAOU_ENGINE_DEEP
-
-		ifneq (,$(findstring TENSOR_RT,$(YANEURAOU_EDITION)))
-			CPPFLAGS      += -DTENSOR_RT
-			NVCC_CPPFLAGS += -DTENSOR_RT
-			LDFLAGS       += -lnvinfer -lnvonnxparser -lcudart
-
-			# YANEURAOU_EDITIONのなかにUBUNTUと言う文字列が含まれているならlinkerなどの設定をしてやる。
-			ifneq (,$(findstring UBUNTU,$(YANEURAOU_EDITION)))
-				CPPFLAGS += -I/usr/local/cuda/include
-				LDFLAGS  += -L/usr/local/cuda/lib64
-				LDFLAGS  += -L/usr/local/cuda/lib64/stubs
-			endif
-
-			CUDA_SOURCES += eval/deep/unpack.cu
-
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_CPU)
-			CPPFLAGS += -DONNXRUNTIME -DORT_NO_EXCEPTIONS -DORT_CPU
-			LDFLAGS += -lonnxruntime
-
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_DML)
-			CPPFLAGS += -DONNXRUNTIME -DORT_NO_EXCEPTIONS -DORT_DML
-			LDFLAGS += -lonnxruntime
-
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_COREML)
-			CPPFLAGS += -DCOREML
-			LDFLAGS += -framework Foundation -framework CoreML
-			OBJC_SOURCES += eval/deep/nn_coreml.mm
-
-		endif
-
-	endif
-
-	# 大して大きなファイルではないので全部追加する。
-	SOURCES += \
-		eval/deep/nn_types.cpp                                          \
-		eval/deep/nn.cpp                                                \
-		eval/deep/nn_onnx_runtime.cpp                                   \
-		eval/deep/nn_tensorrt.cpp                                       \
-		engine/dlshogi-engine/dlshogi_searcher.cpp                      \
-		engine/dlshogi-engine/PrintInfo.cpp                             \
-		engine/dlshogi-engine/UctSearch.cpp                             \
-		engine/dlshogi-engine/Node.cpp                                  \
-		engine/dlshogi-engine/PvMateSearch.cpp                          \
-		engine/dlshogi-engine/FukauraOuEngine.cpp                       \
-		engine/dlshogi-engine/SearchOptions.cpp
-
 endif
 
 ifneq (,$(IS_NNUE_EDITION))
@@ -506,23 +425,6 @@ ifneq (,$(IS_NNUE_EDITION))
 				eval/nnue/embedded_nnue.cpp
 		endif
 	endif
-endif
-
-
-ifeq ($(YANEURAOU_EDITION),TANUKI_MATE_ENGINE)
-	SOURCES += \
-		engine/tanuki-mate-engine/tanuki-mate-search.cpp
-endif
-
-
-ifeq ($(YANEURAOU_EDITION),YANEURAOU_MATE_ENGINE)
-	SOURCES += \
-		engine/yaneuraou-mate-engine/yaneuraou-mate-search.cpp
-endif
-
-ifeq ($(YANEURAOU_EDITION),USER_ENGINE)
-	SOURCES += \
-		engine/user-engine/user-search.cpp
 endif
 
 

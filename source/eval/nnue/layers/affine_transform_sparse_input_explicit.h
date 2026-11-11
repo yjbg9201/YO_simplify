@@ -6,7 +6,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../nnue_common.h"
 #include "affine_transform.h" // For affine_transform_unaligned
@@ -647,6 +646,5 @@ public:
 }  // namespace Eval::NNUE::Layers
 }  // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif  // NNUE_LAYERS_AFFINE_TRANSFORM_SPARSE_INPUT_EXPLICIT_H_INCLUDED

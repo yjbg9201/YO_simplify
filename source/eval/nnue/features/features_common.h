@@ -6,7 +6,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../../../evaluate.h"
 #include "../nnue_common.h"
@@ -40,7 +39,6 @@ enum class Side {
 } // namespace Eval::NNUE::Features
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // #ifndef NNUE_FEATURES_COMMON_H_INCLUDED
 

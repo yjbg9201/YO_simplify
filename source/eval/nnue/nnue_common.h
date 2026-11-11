@@ -10,7 +10,6 @@
 
 #include "../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../../misc.h"  // Tools::Result
 
@@ -210,6 +209,5 @@ namespace Eval::NNUE {
 } // namespace Eval::NNUE
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // #ifndef NNUE_COMMON_H_INCLUDED

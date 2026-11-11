@@ -10,9 +10,6 @@
 //   評価関数に対応するheaderの読み込み
 // -------------------------------------
 
-#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
-#include "eval/evalsum.h"
-#endif
 
 // -------------------------------------
 //             評価関数
@@ -23,7 +20,6 @@ struct StateInfo;
 
 namespace Eval {
 
-#if defined(USE_CLASSIC_EVAL)
 	// 評価関数の初期化。これは起動直後に1度だけ呼び出される。
 	// 💡 引数で受け取ったoptionsを用いて、
 	//     評価関数に必要なエンジンオプションを追加することができる。
@@ -52,21 +48,11 @@ namespace Eval {
 	// 評価関数本体
 	Value evaluate(const Position& pos);
 
-#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
-	// 評価関数パラメーターのチェックサムを返す。
-	u64 calc_check_sum();
-
-	// calc_check_sum()を呼び出して返ってきた値を引数に渡すと、ソフト名を表示してくれる。
-	void print_softname(u64 check_sum);
-#else
 	static u64 calc_check_sum() { return 0; }
 	static void print_softname([[maybe_unused]] u64 check_sum) {}
-#endif
-
-#endif // defined(USE_CLASSIC_EVAL)
 
 
-#if defined (USE_PIECE_VALUE)
+
 
     // 駒割りを計算する。
 	// 💡 この関数は、classic evalでなくとも用いることがある。(例えば、dfpnのMovePickerでmaterialに従ってorderingする場合など)
@@ -117,17 +103,8 @@ namespace Eval {
 	// ⚠  後手の駒に対してもプラスの値が返る。
 	Value CapturePieceValuePlusPromote(const Position& pos, Move move);
 
-#else
-
-	// 📝 cpに変換する時に必要なのでPawnValueだけは定義しておく。
-	enum {
-		PawnValue = 90
-	};
-
-#endif
 
 
-#if defined(USE_EVAL_LIST)
 
 	// --- 評価関数で使う定数 KPP(玉と任意2駒)のPに相当するenum
 
@@ -145,7 +122,6 @@ namespace Eval {
 
 		// --- 手駒
 
-#if defined (EVAL_MATERIAL) || defined (EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_NNUE)
 		// Apery(WCSC26)方式。0枚目の駒があるので少し隙間がある。
 		// 定数自体は1枚目の駒のindexなので、EVAL_KPPの時と同様の処理で問題ない。
 		// 例)
@@ -169,9 +145,6 @@ namespace Eval {
 		e_hand_rook = 88,//f_hand_rook + 3,//87+1
 		fe_hand_end = 90,//e_hand_rook + 3,//90
 
-#else 
-		fe_hand_end = 0,
-#endif                     
 
 		// Bonanzaのように盤上のありえない升の歩や香の番号を詰めない。
 		// 理由1) 学習のときに相対PPで1段目に香がいるときがあって、それを逆変換において正しく表示するのが難しい。
@@ -403,7 +376,6 @@ namespace Eval {
 		// 動く駒と取られる駒とで最大で2つ。
 		int dirty_num;
 	};
-#endif // defined(USE_EVAL_LIST)
 
 #if defined(USE_EVAL_HASH)
 	// EvalHashのリサイズ

@@ -357,7 +357,6 @@ constexpr int MAX_PLY_NUM = 246;
 
 // --- 通常の思考エンジンとして実行ファイルを公開するとき用の設定集
 
-#if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT) || defined(YANEURAOU_ENGINE_NNUE) || defined(YANEURAOU_ENGINE_MATERIAL)
 
 	#define YANEURAOU_ENGINE
 	#define USE_CLASSIC_EVAL
@@ -375,9 +374,7 @@ constexpr int MAX_PLY_NUM = 246;
 	// 定跡関連コマンド
 	#define ENABLE_MAKEBOOK_CMD
 
-	#if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT) || defined(YANEURAOU_ENGINE_NNUE)
 		#define USE_DIFF_EVAL
-	#endif
 
 	#if defined(YANEURAOU_ENGINE_NNUE) && !defined(NNUE_EMBEDDING)
 		// 📝 Stockfishでは、NNUE_EMBEDDING_OFFを定義した時にのみ、
@@ -401,30 +398,9 @@ constexpr int MAX_PLY_NUM = 246;
 
 	// -- 各評価関数ごとのconfiguration
 
-	#if defined(YANEURAOU_ENGINE_MATERIAL)
-		#define EVAL_MATERIAL
 
-		#if !defined(MATERIAL_LEVEL)
-			#define MATERIAL_LEVEL 001
-		#endif
 
-		// 実験用評価関数
-		// 駒得評価関数の拡張扱いをする。
-		#if MATERIAL_LEVEL >= 002
-			// evaluate()のために利きが必要。
-			#define LONG_EFFECT_LIBRARY
-		#endif
-	#endif
 
-	#if defined(YANEURAOU_ENGINE_KPPT)
-		#define EVAL_KPPT
-	#endif
-
-	#if defined(YANEURAOU_ENGINE_KPP_KKPT)
-		#define EVAL_KPP_KKPT
-	#endif
-
-	#if defined(YANEURAOU_ENGINE_NNUE)
 		#define EVAL_NNUE
 
 		// NNUEの使いたい評価関数アーキテクチャの選択
@@ -439,68 +415,20 @@ constexpr int MAX_PLY_NUM = 246;
 		// #define EVAL_NNUE_HALFKP256
 		// #define EVAL_NNUE_KP256
 		// #define EVAL_NNUE_HALFKPE9
-	#endif
 
-#endif // defined(YANEURAOU_ENGINE_KPPT) || ...
 
 // --- Deep Learning系のエンジン ふかうら王(dlshogi互換エンジン)
 
-#if defined(YANEURAOU_ENGINE_DEEP)
-
-	#define EVAL_DEEP "DL"
-	#define USE_EVAL
-	#define USE_TIME_MANAGEMENT
-	#define USE_MATE_1PLY
-	#define USE_MATE_SOLVER
-	#define USE_MATE_DFPN
-	#define USE_PIECE_VALUE
-	#define ENABLE_TEST_CMD
-
-	// 勝率の集計を行う型としてdouble型を用いる。
-	#define WIN_TYPE_DOUBLE
-
-	 //#define ASSERT_LV 3
-#endif
 
 // --- tanuki-詰将棋エンジンとして実行ファイルを公開するとき用の設定集
 
-#if defined(TANUKI_MATE_ENGINE)
-	// 🤔 CLASSIC EVALは用いないが、KEEP_LAST_MOVEのようなStateInfo上の
-	//     追加メンバー変数を用いるには、USE_CLASSIC_EVALを定義する必要がある。
-	#define USE_CLASSIC_EVAL
-	#define KEEP_LAST_MOVE
-	#undef  MAX_PLY_NUM
-	#define MAX_PLY_NUM 2000
-	#define USE_MATE_1PLY
-	//#define LONG_EFFECT_LIBRARY
-	#define ENABLE_TEST_CMD
-#endif
 
 // --- やねうら王詰将棋エンジンとして実行ファイルを公開するとき用の設定集
 
-#if defined(YANEURAOU_MATE_ENGINE)
-	// 🤔 CLASSIC EVALは用いないが、Position::materialのような
-	//     追加メンバー変数を用いるには、USE_CLASSIC_EVALを定義する必要がある。
-	#define USE_CLASSIC_EVAL
-	#undef MAX_PLY_NUM
-	#define MAX_PLY_NUM 2000
-	#define USE_MATE_1PLY
-	//#define LONG_EFFECT_LIBRARY
-	#define USE_MATE_SOLVER
-	#define USE_MATE_DFPN
-	#define USE_PIECE_VALUE
-	#define ENABLE_TEST_CMD
-#endif
 
 
 // --- ユーザーの自作エンジンとして実行ファイルを公開するとき用の設定集
 
-#if defined(USER_ENGINE)
-	//#define USE_SEE
-	//#define USE_EVAL
-	//#define EVAL_MATERIAL
-	//#define USE_PIECE_VALUE
-#endif
 
 // --------------------
 //   for tournament
@@ -699,46 +627,15 @@ constexpr bool pretty_jp = false;
 // ----------------------------
 
 // -- 評価関数の種類によりエンジン名に使用する文字列を変更する。
-#if defined(EVAL_MATERIAL)
-	#if defined(MATERIAL_LEVEL)
-		// MATERIAL_LEVELの番号を"Level"として出力してやる。
-		#define EVAL_TYPE_NAME "MaterialLv" + std::to_string(MATERIAL_LEVEL)
-	#else
-		// 適切な評価関数がないので単にEVAL_MATERIALを指定しているだけだから、EVAL_TYPE_NAMEとしては空欄でいいかと。
-		#define EVAL_TYPE_NAME ""
-	#endif
-#elif defined(EVAL_KPPT)
-	#define EVAL_TYPE_NAME "KPPT"
-#elif defined(EVAL_KPP_KKPT)
-	#define EVAL_TYPE_NAME "KPP_KKPT"
-#elif defined(EVAL_NNUE_KP256)
+#if   defined(EVAL_NNUE_KP256)
 	#define EVAL_TYPE_NAME "NNUE KP256"
 #elif defined(EVAL_NNUE_HALFKPE9)
 	#define EVAL_TYPE_NAME "NNUE halfKPE9"
 	// hafeKPE9には利きが必要
 	#define LONG_EFFECT_LIBRARY
 	#define USE_BOARD_EFFECT_PREV
-#elif defined(EVAL_NNUE) // それ以外のNNUEなので標準NNUE halfKP256だと思われる。
-	#define EVAL_TYPE_NAME "NNUE"
-#elif defined(EVAL_DEEP)
-	#if defined(ONNXRUNTIME)
-		#if defined(ORT_CPU)
-			#define EVAL_TYPE_NAME "ORT_CPU-" EVAL_DEEP
-		#elif defined(ORT_DML)
-			#define EVAL_TYPE_NAME "ORT_DML-" EVAL_DEEP
-		#else
-			#define EVAL_TYPE_NAME "ORT-" EVAL_DEEP
-		#endif
-	#elif defined(TENSOR_RT)
-		// TensorRT、長いのでTRTにしておく。TRTのバージョン、長いのでくっつけるのやめておく。
-		// #define EVAL_TYPE_NAME "TRT" + std::to_string(getInferLibVersion()) + "-" EVAL_DEEP
-		#define EVAL_TYPE_NAME "TRT-" EVAL_DEEP
-	#elif defined(COREML)
-		#define EVAL_TYPE_NAME "CoreML-" EVAL_DEEP
-	#endif
-
 #else
-	#define EVAL_TYPE_NAME ""
+	#define EVAL_TYPE_NAME "NNUE"
 #endif
 
 

@@ -6,7 +6,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../nnue_common.h"
 #include "simd.h"
@@ -463,6 +462,5 @@ class AffineTransformExplicit {
 }  // namespace Eval::NNUE::Layers
 }  // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // NNUE_LAYERS_AFFINE_TRANSFORM_EXPLICIT_H_INCLUDED

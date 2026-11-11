@@ -2,7 +2,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "p.h"
 #include "index_list.h"
@@ -39,4 +38,3 @@ void P::AppendChangedIndices(
 } // namespace Eval::NNUE::Features
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)

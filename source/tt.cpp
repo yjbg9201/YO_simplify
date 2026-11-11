@@ -318,10 +318,6 @@ void TranspositionTable::resize(size_t mbSize, ThreadPool& threads) {
 
 void TranspositionTable::clear(ThreadPool& threads) {
 
-#if defined(TANUKI_MATE_ENGINE) || defined(YANEURAOU_MATE_ENGINE)
-	// MateEngineではこの置換表は用いないのでクリアもしない。
-	return;
-#endif
 
 	generation8 = 0;
 

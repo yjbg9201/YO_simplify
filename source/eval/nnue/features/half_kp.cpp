@@ -2,7 +2,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "half_kp.h"
 #include "index_list.h"
@@ -73,4 +72,3 @@ template class HalfKP<Side::kEnemy>;
 } // namespace YaneuraOu
 
 
-#endif  // defined(EVAL_NNUE)

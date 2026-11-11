@@ -6,7 +6,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "features_common.h"
 #include <array>
@@ -250,6 +249,5 @@ class FeatureSet<FeatureType> : public FeatureSetBase<FeatureSet<FeatureType>> {
 } // namespace Eval::NNUE::Features
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // #ifndef NNUE_FEATURE_SET_H_INCLUDED

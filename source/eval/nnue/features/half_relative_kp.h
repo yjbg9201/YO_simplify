@@ -5,7 +5,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../../../evaluate.h"
 #include "features_common.h"
@@ -59,6 +58,5 @@ class HalfRelativeKP {
 } // namespace Eval::NNUE::Features
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif

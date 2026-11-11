@@ -2,7 +2,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "a2.h"
 #include "index_list.h"
@@ -46,4 +45,3 @@ void A2::AppendChangedIndices(
 }  // namespace Eval::NNUE::Features
 }  // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)

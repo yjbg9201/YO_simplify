@@ -5,7 +5,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../nnue_common.h"
 
@@ -149,6 +148,5 @@ class Sum<PreviousLayer> {
 } // namespace Layers::NNUE::Eval
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif

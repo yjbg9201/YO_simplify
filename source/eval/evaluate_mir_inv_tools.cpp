@@ -1,5 +1,4 @@
 ﻿#include "evaluate_mir_inv_tools.h"
-#if defined(USE_EVAL_LIST)
 
 namespace YaneuraOu {
 
@@ -201,4 +200,3 @@ namespace Eval
 
 } // namespace YaneuraOu
 
-#endif // defined(USE_EVAL_LIST)

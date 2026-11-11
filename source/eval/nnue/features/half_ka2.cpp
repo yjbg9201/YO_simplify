@@ -2,7 +2,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "half_ka2.h"
 #include "index_list.h"
@@ -71,4 +70,3 @@ namespace Eval::NNUE::Features {
 }  // namespace Eval::NNUE::Features
 }  // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)

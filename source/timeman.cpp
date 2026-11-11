@@ -1,6 +1,5 @@
 ﻿#include "config.h"
 
-#if defined(USE_TIME_MANAGEMENT)
 
 #include "misc.h"
 #include "search.h"
@@ -26,12 +25,7 @@ PRNG prng;
 void TimeManagement::add_options(OptionsMap& options) {
 
 		// 指し手がGUIに届くまでの時間。
-#if defined(YANEURAOU_ENGINE_DEEP)
-    // GPUからの結果を待っている時間も込みなのでdefault値を少し上げておく。
-    int time_margin = 400;
-#else
     int time_margin = 120;
-#endif
 
     // ネットワークの平均遅延時間[ms]
     // この時間だけ早めに指せばだいたい間に合う。
@@ -379,4 +373,3 @@ TimePoint TimeManagement::maximum() const { return maximumTime; }
 
 } // namespace YaneuraOu
 
-#endif

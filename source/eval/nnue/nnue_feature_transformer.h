@@ -6,7 +6,6 @@
 
 #include "../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #if defined(SFNNwoPSQT)
 #define USE_ELEMENT_WISE_MULTIPLY
@@ -1024,6 +1023,5 @@ class FeatureTransformer {
 } // namespace Eval::NNUE
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif  // #ifndef NNUE_FEATURE_TRANSFORMER_H_INCLUDED

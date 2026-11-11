@@ -425,9 +425,6 @@ string config_info()
 
 	// 評価関数タイプ
 	string eval_type =
-#if defined(YANEURAOU_ENGINE_DEEP)
-	"DEEP";
-#elif defined(YANEURAOU_ENGINE_NNUE)
 
 	// NNUE
 	#if defined(NNUE_ARCHITECTURE_HEADER)
@@ -452,15 +449,6 @@ string config_info()
 		"halfkp_256x2_32_32";
 	#endif
 
-#elif defined(YANEURAOU_ENGINE_KPPT)
-	"KPPT";
-#elif defined(YANEURAOU_ENGINE_KPP_KKPT)
-	"KPP_KKPT";
-#elif defined(YANEURAOU_ENGINE_MATERIAL)
-	"MATERIAL_LV" + to_string(MATERIAL_LEVEL);
-#else
-	"Unknown";
-#endif
 
 	config += o ("EVAL"                , eval_type);
 

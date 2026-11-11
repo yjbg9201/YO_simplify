@@ -6,7 +6,6 @@
 
 #include "../../config.h"
 
-#if defined(EVAL_NNUE)
 
 // Defines the network structure
 // 入力特徴量とネットワーク構造が定義されたヘッダをincludeする
@@ -82,6 +81,5 @@ namespace Eval::NNUE {
 } // namespace Eval::NNUE
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // #ifndef NNUE_ARCHITECTURE_H_INCLUDED

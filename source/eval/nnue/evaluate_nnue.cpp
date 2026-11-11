@@ -2,7 +2,6 @@
 
 #include "../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include <algorithm>
 #include <array>
@@ -38,7 +37,6 @@ extern int FV_SCALE;
 //              旧評価関数のためのヘルパー
 // ============================================================
 
-#if defined(USE_CLASSIC_EVAL)
 using namespace YaneuraOu;
 void add_options_(OptionsMap& options, ThreadPool& threads);
 
@@ -104,7 +102,6 @@ void add_options_(OptionsMap& options, ThreadPool& threads) {
                 }));
 
 }
-#endif
 
 // Macro to embed the default efficiently updatable neural network (NNUE) file
 // data in the engine binary (using incbin.h, by Dale Weiler).
@@ -1018,4 +1015,3 @@ void print_eval_stat(Position& /*pos*/) {
 } // namespace Eval
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)

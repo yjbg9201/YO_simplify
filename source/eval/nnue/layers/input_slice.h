@@ -6,7 +6,6 @@
 
 #include "../../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "../nnue_common.h"
 
@@ -74,6 +73,5 @@ class InputSlice {
 } // namespace Eval::NNUE::Layers
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif // #ifndef NNUE_LAYERS_INPUT_SLICE_H_INCLUDED

@@ -1,6 +1,5 @@
 ﻿#include "../../types.h"
 
-#if defined (YANEURAOU_ENGINE)
 
 // -----------------------
 //  やねうら王 標準探索部
@@ -235,7 +234,6 @@ void YaneuraOuEngine::isready() {
 
 	// 🌈 やねうら王独自オプションの内容を設定などに反映させる。
 
-#if defined(USE_CLASSIC_EVAL)
     // 📌 旧評価関数は、isreadyに対して呼び出す。
     //     評価関数パラメーターの読み込み処理が必要。
     Engine::run_heavy_job([] { Eval::load_eval(); });
@@ -246,7 +244,6 @@ void YaneuraOuEngine::isready() {
     //     "position"コマンドを送信しないと局面が不正で落ちて面倒。
     states = StateListPtr(new std::deque<StateInfo>(1));
     pos.set(StartSFEN, &states->back());
-#endif
 
 	// 📌 基本設定(base classのisready()を呼び出してやる)
 	//Engine::isready();
@@ -3041,7 +3038,6 @@ Value YaneuraOuWorker::search(Position& pos, Stack* ss, Value alpha, Value beta,
             unadjustedStaticEval = evaluate(pos);
 
 #if !STOCKFISH
-#if defined(YANEURAOU_ENGINE_NNUE)
 #if defined(USE_LAZY_EVALUATE)
         // 🌈 これ書かないとR70ぐらい弱くなる。
         else if (PvNode)
@@ -3062,7 +3058,6 @@ Value YaneuraOuWorker::search(Position& pos, Stack* ss, Value alpha, Value beta,
         // lazy evalを使わないなら、この時点でどうにかしておく。
         else
 			unadjustedStaticEval = evaluate(pos);
-#endif
 #endif
 #endif
 
@@ -4718,13 +4713,11 @@ Value Search::YaneuraOuWorker::qsearch(Position& pos, Stack* ss, Value alpha, Va
             unadjustedStaticEval = ttData.eval;
             if (!is_valid(unadjustedStaticEval))
                 unadjustedStaticEval = evaluate(pos);
-#if defined(USE_CLASSIC_EVAL)
 			else if (PvNode) {
 				// 🌈 やねうら王独自
 				unadjustedStaticEval = evaluate(pos);
 				// ⇨ NNUEだとこれ入れたほうが強い可能性が…。
 			}
-#endif
 
 			ss->staticEval = bestValue =
 				to_corrected_static_eval(unadjustedStaticEval, correctionValue);
@@ -5943,4 +5936,3 @@ void engine_main() {
 static EngineFuncRegister r(engine_main, "YaneuraOuEngine", 0);
 }
 
-#endif // YANEURAOU_ENGINE

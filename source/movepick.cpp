@@ -1,5 +1,4 @@
 ﻿#include "movepick.h"
-#if defined(USE_MOVE_PICKER)
 
 #include <algorithm>
 //#include <cassert>
@@ -698,4 +697,3 @@ void MovePicker::skip_quiet_moves() { skipQuiets = true; }
 
 } // namespace YaneuraOu
 
-#endif // defined(USE_MOVE_PICKER)

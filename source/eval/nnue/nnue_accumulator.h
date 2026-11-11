@@ -5,7 +5,6 @@
 
 #include "../../config.h"
 
-#if defined(EVAL_NNUE)
 
 #include "nnue_architecture.h"
 
@@ -26,6 +25,5 @@ struct alignas(64) Accumulator {
 } // namespace Eval::NNUE
 } // namespace YaneuraOu
 
-#endif  // defined(EVAL_NNUE)
 
 #endif

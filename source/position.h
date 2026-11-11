@@ -11,9 +11,7 @@
 #include "evaluate.h"
 #include "types.h"
 
-#if defined(EVAL_NNUE)
 #include "eval/nnue/nnue_accumulator.h"
-#endif
 
 #include "extra/key128.h"
 #include "extra/long_effect.h"
@@ -43,7 +41,6 @@ struct StateInfo {
 	// Copied when making a move
     // 指し手で局面を進めるときにコピーされる。
 
-#if defined(USE_PARTIAL_KEY)
 	// 位置を無視したPiece(手番考慮ありの駒)によるhash key
     /*  📓
 			StockfishはZobrist::psq[pc][8 + 枚数] でxorしていく。
@@ -61,7 +58,6 @@ struct StateInfo {
 
 	// 歩以外の駒によるhash key(盤上のみ)
     Key nonPawnKey[COLOR_NB];
-#endif
 
 #if STOCKFISH
 	// 歩以外の駒割。
@@ -190,29 +186,15 @@ struct StateInfo {
 
 	// --- evaluate
 
-#if defined(USE_PIECE_VALUE)
         // この局面での評価関数の駒割
         Value materialValue;
-#endif
 
-#if defined(USE_CLASSIC_EVAL)
 
-#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
 
-	// 評価値。(次の局面で評価値を差分計算するときに用いる)
-	// まだ計算されていなければsum.p[2][0]の値はint_max
-	Eval::EvalSum sum;
-
-#endif
-
-#if defined(EVAL_NNUE)
 	Eval::NNUE::Accumulator accumulator;
-#endif
 
-#if defined (USE_EVAL_LIST)
 	// 評価値の差分計算の管理用
 	Eval::DirtyPiece dirtyPiece;
-#endif
 
 #if defined(KEEP_LAST_MOVE)
 	// 直前の指し手。デバッグ時などにおいてその局面までの手順を表示出来ると便利なことがあるのでそのための機能
@@ -222,7 +204,6 @@ struct StateInfo {
 	PieceType lastMovedPieceType;
 #endif
 
-#endif
 };
 
 // --------------------
@@ -728,18 +709,14 @@ public:
 
 	// --- Evaluation
 
-#if defined(USE_EVAL_LIST)
 	// 評価関数で使うための、どの駒番号の駒がどこにあるかなどの情報。
 	const Eval::EvalList* eval_list() const { return &evalList; }
-#endif
 
-#if defined (USE_SEE)
 	// 指し手mのsee(Static Exchange Evaluation : 静的取り合い評価)において
 	// v(しきい値)以上になるかどうかを返す。
 	// see_geのgeはgreater or equal(「以上」の意味)の略。
 	bool see_ge(Move m, Value threshold = VALUE_ZERO) const;
 
-#endif
 
     // -----------------------
     // Accessing hash keys
@@ -1091,7 +1068,6 @@ private:
 	int enteringKingPoint[COLOR_NB];
 
 
-#if defined (USE_EVAL_LIST)
 	// --- 盤面を更新するときにEvalListの更新のために必要なヘルパー関数
 
 	// c側の手駒ptの最後の1枚のBonaPiece番号を返す
@@ -1113,12 +1089,6 @@ private:
 		ASSERT_LV3(is_ok(n));
 		return n;
 	}
-#else
-	// 駒番号を使わないとき用のダミー
-	PieceNumber piece_no_of(Color c, Piece pt) const { return PIECE_NUMBER_ZERO; }
-	PieceNumber piece_no_of(Piece pc, Square sq) const { return PIECE_NUMBER_ZERO; }
-	PieceNumber piece_no_of(Square sq) const { return PIECE_NUMBER_ZERO; }
-#endif
 
 	// --------------------
     //    Data members
@@ -1169,10 +1139,8 @@ private:
 	// set_max_repetition_ply()で設定される、千日手の最大遡り手数
     static int max_repetition_ply /* = 16 */;
 
-#if defined(USE_EVAL_LIST)
     // 評価関数で用いる駒のリスト
     Eval::EvalList evalList;
-#endif
 
 #endif
 };
@@ -1275,7 +1243,6 @@ inline Key Position::adjust_key50(Key k) const {
 inline Key Position::key() const { return st->key(); }
 #endif
 
-#if defined(USE_PARTIAL_KEY)
 inline Key Position::pawn_key() const { return st->pawnKey; }
 
 inline Key Position::material_key() const { return st->materialKey; }
@@ -1283,16 +1250,6 @@ inline Key Position::material_key() const { return st->materialKey; }
 inline Key Position::minor_piece_key() const { return st->minorPieceKey; }
 
 inline Key Position::non_pawn_key(Color c) const { return st->nonPawnKey[c]; }
-#else
-
-// 使わないのでダミーの値を返すようにしておく。
-
-inline Key Position::pawn_key() const { return Key(); }
-inline Key Position::material_key() const { return Key(); }
-inline Key Position::minor_piece_key() const { return Key(); }
-inline Key Position::non_pawn_key(Color c) const { return Key(); }
-
-#endif
 
 #if STOCKFISH
 inline Value Position::non_pawn_material(Color c) const { return st->nonPawnMaterial[c]; }
