@@ -481,7 +481,6 @@ using EngineEntry = std::tuple<std::function<void()>, std::string, int>;
 
 // エンジンの共通の登録先
 // 📝 static EngineFuncRegister reg_a(engine_main_a, 1); のようにしてengine_main_a()を登録する。
-//     USER_ENGINEであるuser-engine.cpp を参考にすること。
 static std::vector<EngineEntry>& engineFuncs() {
 	// 💡 関数のなかのstatic変数は最初に呼び出された時に初期化されることが保証されている。
 	//     なので、初期化順の問題は発生しない。

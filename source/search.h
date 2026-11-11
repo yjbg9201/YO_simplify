@@ -367,7 +367,6 @@ struct UpdateContext {
          やねうら王探索部のWorker(YaneuraOuWorker)のコメントも確認すること。
 
 	📝  エンジンを自作する時は、このclassを派生させて、このclassのfactoryをThreadPoolに渡す。
-		例として、USER_ENGINE である、user-engine.cpp のソースコードを見ると良い。
 */
 
 class Worker

@@ -20,14 +20,6 @@ namespace YaneuraOu {
 constexpr auto BenchmarkCommand = "speedtest";
 
 
-// Engine開発者が用いる"test"コマンド。
-namespace Test {
-void test_cmd(IEngine& engine, std::istringstream& is);
-}
-
-// 定跡を作るコマンド
-
-
 /*
 	📓 複数のlambda型を1つにまとめるtemplate。
         以下例のようにvariant型からの(デザパタの)visitorパターンを簡単に書ける。

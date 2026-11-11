@@ -31,8 +31,6 @@ public:
 
 	// main threadをUSIメッセージの受信のために待機させる。
 	// "quit"コマンドが送られてくるまでこのループは抜けない。
-	// 📝 wasmではブラウザのメインスレッドをブロックできないため、この関数は何もしない。
-	//     代わりにwasm_pre.jsからusi_command()経由でexec_command_from_js()が呼び出される。
 	void loop();
 
 

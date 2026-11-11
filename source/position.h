@@ -723,7 +723,6 @@ public:
 
 	// ピンされているc側の駒。下手な方向に移動させるとc側の玉が素抜かれる。
 	// 手番側のpinされている駒はpos.pinned_pieces(pos.side_to_move())のようにして取得できる。
-	// LONG_EFFECT_LIBRARYを使うときのmateルーチンで使用しているので消さないで！
 	Bitboard pinned_pieces(Color c) const { ASSERT_LV3(is_ok(c)); return st->blockersForKing[c] & pieces(c); }
 
 	// ↑のtemplate版

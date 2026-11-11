@@ -136,7 +136,6 @@ public:
     // 生成するWorker派生classを変更することができる。
     //
     // 💡 Worker::resize_threads()がその処理なので、Worker::resize_threads()の実装を参考にすること。
-    //     また、USER_ENGINEの実装(user-engine.cpp)も参考にすること。
     virtual void resize_threads() = 0;
 
 	// options["USI_Hash"]などの置換表サイズに対して、それが変更された時に呼び出されるhandler。
@@ -518,7 +517,6 @@ class EngineWrapper: public IEngine {
 
 // 🌈 エンジンを登録するヘルパー
 // 📝 static EngineFuncRegister reg_a(engine_main_a, 0); のようにしてengineのentry pointを登録する。
-//     USER_ENGINEであるuser-engine.cpp を参考にすること。
 //     priorityが一番高いものが実行される。
 struct EngineFuncRegister {
 	EngineFuncRegister(std::function<void()> f, const std::string& engine_name, int priority);

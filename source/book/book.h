@@ -177,7 +177,6 @@ struct MemoryBook
 	BookMovesPtr find(const Position& pos);
 
 	// [ASYNC] 定跡を内部に読み込む。
-	// ・Aperyの定跡ファイルは"book/book.bin"だと仮定。(これはon the fly読み込みに非対応なので丸読みする)
 	// ・やねうら王の定跡ファイルは、on_the_flyが指定されているとメモリに丸読みしない。
 	//      Options["BookOnTheFly"]がtrueのときはon the flyで読み込むのでそれ用。
 	// 　　定跡作成時などはこれをtrueにしてはいけない。(メモリに読み込まれないため)

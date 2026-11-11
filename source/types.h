@@ -311,7 +311,6 @@ static std::ostream& operator<<(std::ostream& os, SquareWithWall sqww) { os << s
 
 // Long Effect Libraryの一部。これは8近傍、24近傍の利きを直列化したり方角を求めたりするライブラリ。
 // ここではその一部だけを持って来た。(これらは頻繁に用いるので)
-// それ以上を使いたい場合は、LONG_EFFECT_LIBRARYというシンボルをdefineして、extra/long_effect.hをincludeすること。
 namespace Effect8
 {
 	// 方角を表す。遠方駒の利きや、玉から見た方角を表すのに用いる。
@@ -1149,7 +1148,6 @@ typedef std::chrono::milliseconds::rep TimePoint;
 static_assert(sizeof(TimePoint) == sizeof(int64_t), "TimePoint should be 64 bits");
 
 // 自作エンジンのEntry Point。
-// 使い方は自作エンジンのサンプルであるUSER_ENGINEの user-engine/user-search.cpp を参考にすること。
 extern void engine_main();
 
 
