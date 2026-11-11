@@ -20,7 +20,7 @@
 // CPU capability switch for NNUE dot-product code. For SFNN H1=7 networks
 // (fc0: ->8, packed tail: 14->64->1), measured AVX512VNNI was slower than
 // AVX512 maddubs/madd, so only that NNUE shape uses the fallback.
-#if defined(USE_VNNI) && !defined(NNUE_SFNN_HIDDEN1_7)
+#if defined(USE_VNNI)
     #define USE_NNUE_VNNI
 #endif
 

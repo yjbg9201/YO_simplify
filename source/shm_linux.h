@@ -19,7 +19,7 @@
 #ifndef SHM_LINUX_H_INCLUDED
 #define SHM_LINUX_H_INCLUDED
 
-#if !defined(__linux__) || defined(__ANDROID__)
+#if !defined(__linux__)
     #error shm_linux.h should not be included on this platform.
 #endif
 

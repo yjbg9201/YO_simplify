@@ -208,20 +208,6 @@ class AffineTransformSparseInput {
 		const auto input = previous_layer_.Propagate(transformed_features, buffer + kSelfBufferSize);
 		const auto output = reinterpret_cast<OutputType*>(buffer);
 
-#if defined(USE_WASM_SIMD)
-		{
-			// Simplify variable names (y = Ax + b)
-			constexpr int n = kInputDimensions;
-			constexpr int m = kOutputDimensions;
-			constexpr int n_stride = kPaddedInputDimensions;
-			auto A = *reinterpret_cast<const int8_t(*)[m][n_stride]>(weights_);
-			auto x = *reinterpret_cast<const uint8_t(*)[n]>(input);
-			auto b = *reinterpret_cast<const int32_t(*)[m]>(biases_);
-			auto y = *reinterpret_cast<int32_t(*)[m]>(buffer);
-			emscripten_wasm_simd::affine<n, m, n_stride>(A, x, b, y);
-			return y;
-		}
-#endif
 
 #if defined(USE_SSSE3) || USE_NEON >= 8
 

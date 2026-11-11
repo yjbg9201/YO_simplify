@@ -12,10 +12,6 @@
 #include "engine.h"
 #include "movegen.h"
 
-#if defined(__EMSCRIPTEN__)
-// yaneuraou.wasm
-#include <emscripten.h>
-#endif
 
 
 namespace YaneuraOu {
@@ -143,7 +139,6 @@ void USIEngine::loop()
     // 起動時コマンドは、マルチインスタンス時に注入先を選べるよう、
     // 選択されたEngineのentry point側からstd_inputへ積む。
 
-#if !defined(__EMSCRIPTEN__)
 
 	// USIコマンドの処理
 	while (true)
@@ -159,10 +154,6 @@ void USIEngine::loop()
 	// エンジンの終了を待つ。
 	engine.wait_for_search_finished();
 
-#else
-	// yaneuraOu.wasm
-	// ここでループしてしまうと、ブラウザのメインスレッドがブロックされてしまう。
-#endif
 }
 
 // USIEngine::loop()の下請け。
@@ -1406,9 +1397,6 @@ void user_test(Position& pos, std::istringstream& is);
 
 
 // "gameover"コマンドに対するハンドラ
-#if defined(USE_GAMEOVER_HANDLER) || defined(YANEURAOU_ENGINE_DEEP)
-void gameover_handler(const string& cmd);
-#endif
 
 // --------------------
 //   USI parse helper
@@ -1475,7 +1463,6 @@ void USIEngine::isready()
 
 	// yaneuraou.wasm
 	// ブラウザのメインスレッドをブロックしないよう、Keep Alive処理をコメントアウト
-#if !defined(__EMSCRIPTEN__)
 	// --- Keep Alive的な処理 ---
 
 	// "isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。(keep alive的な処理)
@@ -1523,15 +1510,11 @@ void USIEngine::isready()
 		Tools::sleep(100);
 
 	// --- Keep Alive的な処理ここまで ---
-#endif
 
 	// スレッドを先に生成しないとUSI_Hashで確保したメモリクリアの並列化が行われなくて困る。
 
 	//Threads.set(size_t(options["Threads"]));
 
-#if defined (USE_EVAL_HASH)
-	Eval::EvalHash_Resize(Options["EvalHash"]);
-#endif
 
 	// Engine側のisready callback
 	engine.isready();
@@ -1551,9 +1534,6 @@ void USIEngine::isready()
 
 	//Search::clear();
 
-#if defined (USE_EVAL_HASH)
-	Eval::EvalHash_Clear();
-#endif
 
 	//Threads.stop = false;
 
@@ -1613,43 +1593,5 @@ std::string USIEngine::value(Value v)
 
 #endif
 
-#if defined(__EMSCRIPTEN__)
-// --------------------
-// EMSCRIPTEN support
-// --------------------
-
-namespace {
-// wasm_keep_alive()で保持するインスタンス。プロセス終了まで解放しない。(理由はusi.hを参照)
-std::unique_ptr<IEngine>   wasm_engine;
-std::unique_ptr<USIEngine> wasm_usi;
-}  // namespace
-
-void wasm_keep_alive(std::unique_ptr<IEngine> engine, std::unique_ptr<USIEngine> usi) {
-    wasm_engine = std::move(engine);
-    wasm_usi    = std::move(usi);
-}
-
-USIEngine* wasm_usi_instance() { return wasm_usi.get(); }
-
-int USIEngine::exec_command_from_js(const std::string& cmd) {
-    // 💡 usi_cmdexec()の戻り値("quit"ならtrue)は使わない。
-    //     "quit"はwasm_pre.jsが先にModule.terminate()で処理するため、ここには届かない。
-    usi_cmdexec(cmd);
-
-    return 0;
-}
-
-// USI応答部 emscriptenインターフェース
-// 💡 wasm_pre.jsからModule.ccall("usi_command", ...)で呼び出される。
-EMSCRIPTEN_KEEPALIVE extern "C" int usi_command(const char* c_cmd) {
-    USIEngine* usi = wasm_usi_instance();
-
-    // engine_main()が未実行。JS側に再送してもらう。
-    if (usi == nullptr)
-        return 1;
-
-    return usi->exec_command_from_js(std::string(c_cmd));
-}
-#endif
 
 } // namespace YaneuraOu

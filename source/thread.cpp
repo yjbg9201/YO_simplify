@@ -32,7 +32,6 @@ Thread::Thread(Search::SharedState& sharedState,
     //nthreads(sharedState.options["Threads"]),
     stdThread(&Thread::idle_loop, this) {
 
-#if !defined(__EMSCRIPTEN__)
 
 #if STOCKFISH
 	run_custom_job([this, &binder, &sharedState /*, &sm*/, n]() {
@@ -60,24 +59,6 @@ Thread::Thread(Search::SharedState& sharedState,
     // スレッドはsearching == trueで開始するので、このままworkerのほう待機状態にさせておく
     wait_for_search_finished();
 
-#else
-    // yaneuraou.wasm
-    // wait_for_search_finished すると、ブラウザのメインスレッドをブロックしデッドロックが発生するため、待機しない。
-    //
-    // 新しいスレッドが cv を設定するのを待ってから、ブラウザに処理をパスしたいが、
-    // 新しいスレッド用のworkerを作成するためには、いったんブラウザに処理をパスする必要がある。
-    //
-    // https://bugzilla.mozilla.org/show_bug.cgi?id=1049079
-    //
-    // 📝 同じ理由でrun_custom_job()の完了も待てないため、workerは生成スレッド上で直接生成する。
-    //     run_custom_job()に任せると、ジョブが実行される前にThread::clear_worker()が
-    //     worker == nullptrのまま呼ばれうる。
-    //     run_custom_job()を経由する目的はNUMAノードにbindしたスレッド上で
-    //     workerのメモリを確保することだが、wasmにNUMAは無い。
-    this->numaAccessToken = binder();
-    this->worker          = std::move(
-      worker_factory(sharedState, {n, idxInNuma, totalNuma, this->numaAccessToken}));
-#endif
 }
 
 // Destructor wakes up the thread in idle_loop() and waits

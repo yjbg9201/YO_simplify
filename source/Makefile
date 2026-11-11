@@ -320,100 +320,23 @@ SOURCES  = \
 	search.cpp                                                                 \
 	score.cpp                                                                  \
 	benchmark.cpp                                                              \
-	tune.cpp                                                                   \
 	book/book.cpp                                                              \
-	book/apery_book.cpp                                                        \
 	extra/bitop.cpp                                                            \
 	extra/sfen_packer.cpp                                                      \
 	mate/mate.cpp                                                              \
 	mate/mate1ply_without_effect.cpp                                           \
 	eval/evaluate_bona_piece.cpp                                               \
-	eval/evaluate.cpp                                                          \
-	eval/evaluate_io.cpp                                                       \
-	eval/evaluate_mir_inv_tools.cpp
+	eval/evaluate.cpp
 
 CUDA_SOURCES =
 
 OBJC_SOURCES =
 
 
-ifneq (,$(IS_NNUE_EDITION))
-	ifeq ($(ENGINE_ARCH_UPPER),NNUE)
-	else
-		# NNUE_* または SFNN_* は標準NNUE型の亜種なので、とりあえず
-		# "YANEURAOU_ENGINE_NNUE"というシンボルを定義してやる。
-		CPPFLAGS += -DYANEURAOU_ENGINE_NNUE
-
-		ifeq ($(ENGINE_ARCH_UPPER),NNUE_KP256)
-			CPPFLAGS += -DEVAL_NNUE_KP256
-
-		else ifeq ($(ENGINE_ARCH_UPPER),NNUE_HALFKPE9)
-			CPPFLAGS += -DEVAL_NNUE_HALFKPE9
-
-		else ifeq ($(ENGINE_ARCH_UPPER),NNUE_HALFKP_512X2_16_32)
-			CPPFLAGS += -DEVAL_NNUE_HALFKP_512X2_16_32
-
-		else ifeq ($(ENGINE_ARCH_UPPER),NNUE_HALFKP_1024X2_8_32)
-			CPPFLAGS += -DEVAL_NNUE_HALFKP_1024X2_8_32
-
-		else ifeq ($(ENGINE_ARCH_UPPER),NNUE_HALFKP_1024X2_8_64)
-			CPPFLAGS += -DEVAL_NNUE_HALFKP_1024X2_8_64
-
-		else ifeq ($(ENGINE_ARCH_UPPER),NNUE_HALFKP_VM_256X2_32_32)
-			CPPFLAGS += -DEVAL_NNUE_HALFKP_VM_256X2_32_32
-
-		else ifeq ($(ENGINE_ARCH_UPPER),SFNN1536)
-			CPPFLAGS += -DYANEURAOU_ENGINE_SFNN1536
-			CPPFLAGS += -DSFNNwoPSQT
-		else
-			# 知らないNNUEのarchitectureなので、architecture headerを動的に生成する。
-			ARCH_HEADER_FILE = \"architectures/$(NNUE_ARCH).h\"
-			CPPFLAGS += -DNNUE_ARCHITECTURE_HEADER=$(ARCH_HEADER_FILE)
-			ARCH_GEN_SCRIPT = $(PYTHON) eval/nnue/architectures/nnue_arch_gen.py $(NNUE_ARCH) eval/nnue/architectures
-
-			# SFNN_* はPSQTなしSFNNなので、シンボル SFNNwoPSQT 定義しておく。
-			ifneq (,$(filter SFNN%,$(NNUE_ARCH_UPPER)))
-				CPPFLAGS += -DSFNNwoPSQT
-				ifneq (,$(findstring _7_,$(NNUE_ARCH_UPPER)))
-					CPPFLAGS += -DNNUE_SFNN_HIDDEN1_7
-				endif
-			endif
-		endif
-	endif
-
-	# 大して大きなファイルではないので全部してしまう。
-	SOURCES += \
-		eval/nnue/evaluate_nnue.cpp                                     \
-		eval/nnue/features/k.cpp                                        \
-		eval/nnue/features/p.cpp                                        \
-		eval/nnue/features/a2.cpp                                       \
-		eval/nnue/features/half_kp.cpp                                  \
-		eval/nnue/features/half_ka1.cpp                                 \
-		eval/nnue/features/half_ka_hm1.cpp                              \
-		eval/nnue/features/half_ka2.cpp                                 \
-		eval/nnue/features/half_ka_hm2.cpp                              \
-		eval/nnue/features/half_kp_vm.cpp                               \
-		eval/nnue/features/half_relative_kp.cpp                         \
-		eval/nnue/features/half_kpe9.cpp                                \
-		eval/nnue/features/pe9.cpp                                      \
-		engine/yaneuraou-engine/yaneuraou-search.cpp
-
-	ifneq (,$(findstring em++,$(COMPILER)))
-		SOURCES += \
-			eval/nnue/wasm_simd.cpp
-	endif
-	ifeq ($(EVAL_EMBEDDING),ON)
-		CPPFLAGS += -DNNUE_EMBEDDING
-		ifneq (,$(findstring em++,$(COMPILER)))
-			# 📝 incbin.hによるパラメーターの埋め込みは、.incbinで置いたデータシンボルを
-			#     wasm-ldがリンクできないため使えない。代わりに、パラメーターを文字列リテラルとして
-			#     持つembedded_nnue.cppをリンクする。このファイルはtools/build/wasm_build.jsが生成する。
-			SOURCES += \
-				eval/nnue/embedded_nnue.cpp
-		endif
-	endif
-endif
-
+SOURCES += \
+	eval/nnue/evaluate_nnue.cpp                                     \
+	eval/nnue/features/half_kp.cpp                                  \
+	engine/yaneuraou-engine/yaneuraou-search.cpp
 
 ifneq ($(ENGINE_NAME),)
 	CPPFLAGS += -DENGINE_NAME_FROM_MAKEFILE=$(ENGINE_NAME)

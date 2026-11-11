@@ -22,14 +22,10 @@
 //     やねうら王ではそこではやりたくないので…。
 #include "misc.h"
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
     #include "shm_linux.h"
 #endif
 
-#if defined(__ANDROID__)
-    #include <limits.h>
-    #define SF_MAX_SEM_NAME_LEN NAME_MAX
-#endif
 
 #include "types.h"
 
@@ -393,7 +389,7 @@ class SharedMemoryBackend {
     std::string last_error_message;
 };
 
-#elif defined(__linux__) && !defined(__ANDROID__)
+#elif defined(__linux__)
 
 template<typename T>
 class SharedMemoryBackend {
@@ -525,7 +521,7 @@ struct SystemWideSharedConstant {
                       discriminator);
         std::string shm_name = buf;
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
         // POSIX shared memory names must start with a slash
         shm_name = "/sf_" + createHashString(shm_name);
 

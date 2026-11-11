@@ -42,7 +42,7 @@
 
 // We support linux very well, but we explicitly do NOT support Android,
 // because there is no affected systems, not worth maintaining.
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
     #if !defined(_GNU_SOURCE)
         #define _GNU_SOURCE
     #endif
@@ -505,7 +505,7 @@ std::set<CpuIndex> readCacheMembers(const T* info, Pred&& is_cpu_allowed) {
 
 #endif
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 
 inline std::set<CpuIndex> get_process_affinity() {
 
@@ -559,7 +559,7 @@ inline std::set<CpuIndex> get_process_affinity() {
 
 #endif
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 
 inline static const auto STARTUP_PROCESSOR_AFFINITY = get_process_affinity();
 
@@ -683,7 +683,7 @@ class NumaConfig {
                                   bool respectProcessAffinity = true) {
         NumaConfig cfg = empty();
 
-#if !((defined(__linux__) && !defined(__ANDROID__)) || defined(_WIN64))
+#if !((defined(__linux__)) || defined(_WIN64))
         // Fallback for unsupported systems.
         for (CpuIndex c = 0; c < SYSTEM_THREADS_NB; ++c)
             cfg.add_cpu_to_node(NumaIndex{0}, c);
@@ -709,7 +709,7 @@ class NumaConfig {
             return !allowedCpus.has_value() || allowedCpus->count(c) == 1;
         };
 
-    #elif defined(__linux__) && !defined(__ANDROID__)
+    #elif defined(__linux__)
 
         std::set<CpuIndex> allowedCpus;
 
@@ -1040,7 +1040,7 @@ class NumaConfig {
         if (n >= nodes.size() || nodes[n].size() == 0)
             std::exit(EXIT_FAILURE);
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 
         cpu_set_t* mask = CPU_ALLOC(highestCpuIndex + 1);
         if (mask == nullptr)
@@ -1327,7 +1327,7 @@ class NumaConfig {
                                        [[maybe_unused]] Pred&& is_cpu_allowed) {
         NumaConfig cfg = empty();
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 
         // On Linux things are straightforward, since there's no processor groups and
         // any thread can be scheduled on all processors.
@@ -1424,7 +1424,7 @@ class NumaConfig {
           NumaConfig::from_system(SystemNumaPolicy{}, respectProcessAffinity);
         std::vector<L3Domain> l3Domains;
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 
         std::set<CpuIndex> seenCpus;
         auto               nextUnseenCpu = [&seenCpus]() {

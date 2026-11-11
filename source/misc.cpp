@@ -40,12 +40,12 @@ using fun8_t = bool(*)(HANDLE, BOOL, PTOKEN_PRIVILEGES, DWORD, PTOKEN_PRIVILEGES
 //#include <vector>
 //#include <cstdlib>
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if defined(__linux__)
 #include <stdlib.h>
 #include <sys/mman.h> // madvise()
 #endif
 
-#if defined(__APPLE__) || defined(__ANDROID__) || defined(__OpenBSD__) || (defined(__GLIBCXX__) && !defined(_GLIBCXX_HAVE_ALIGNED_ALLOC) && !defined(_WIN32)) || defined(__e2k__)
+#if defined(__APPLE__) || defined(__OpenBSD__) || (defined(__GLIBCXX__) && !defined(_GLIBCXX_HAVE_ALIGNED_ALLOC) && !defined(_WIN32)) || defined(__e2k__)
 #define POSIXALIGNEDALLOC
 #include <stdlib.h>
 #endif
@@ -342,8 +342,6 @@ string compiler_info() {
 	compiler += " on MinGW64";
 #elif defined(__MINGW32__)
 	compiler += " on MinGW32";
-#elif defined(__ANDROID__)
-	compiler += " on Android";
 #elif defined(__linux__)
 	compiler += " on Linux";
 #elif defined(_WIN64)
@@ -503,11 +501,6 @@ void start_logger(const string& fname) { Logger::start(fname); }
 // --------------------
 
 // prefetch命令を使わない。
-#if defined (NO_PREFETCH)
-
-void prefetch(const void*) {}
-
-#else
 
 void prefetch([[maybe_unused]] const void* addr) {
 
@@ -532,7 +525,6 @@ void prefetch([[maybe_unused]] const void* addr) {
 #endif
 }
 
-#endif
 
 // 📌 ここ以下は、やねうら王の独自追加 📌
 
@@ -561,7 +553,6 @@ namespace Tools {
 	// ※ Stockfishのtt.cppのTranspositionTable::clear()にあるコードと同等のコード。
 	void memclear(ThreadPool& threads, const char* name_, void* table, size_t size)
 	{
-#if !defined(__EMSCRIPTEN__)
 
 		// Windows10では、このゼロクリアには非常に時間がかかる。
 		// malloc()時点ではメモリを実メモリに割り当てられておらず、
@@ -599,12 +590,6 @@ namespace Tools {
 		if (name_ != nullptr)
 			sync_cout << "info string " + string(name_) + " : Finish clearing." << sync_endl;
 
-#else
-		// yaneuraou.wasm
-		// pthread_joinによってブラウザのメインスレッドがブロックされるため、単一スレッドでメモリをクリアする処理に変更
-
-		memset(table, 0, size);
-#endif
 
 	}
 
@@ -923,7 +908,7 @@ namespace SystemIO
 	{
 #if defined(_MSC_VER)
 		return _ftelli64(f);
-#elif defined(__GNUC__) && defined(IS_64BIT) && !(defined(__ANDROID__) && defined(__ANDROID_API__) && __ANDROID_API__ < 24) && !defined(__MACH__)
+#elif defined(__GNUC__) && defined(IS_64BIT) && !defined(__MACH__)
 		return ftello64(f);
 #else
 		return ftell(f);
@@ -934,7 +919,7 @@ namespace SystemIO
 	{
 #if defined(_MSC_VER)
 		return _fseeki64(f, offset, origin);
-#elif defined(__GNUC__) && defined(IS_64BIT) && !(defined(__ANDROID__) && defined(__ANDROID_API__) && __ANDROID_API__ < 24) && !defined(__MACH__)
+#elif defined(__GNUC__) && defined(IS_64BIT) && !defined(__MACH__)
 		return fseeko64(f, offset, origin);
 #else
 		return fseek(f, offset, origin);

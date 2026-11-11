@@ -78,7 +78,6 @@ class Option {
    private:
     friend class OptionsMap;
     friend class Engine;
-    friend class Tune;
 
     // このオプション設定のdefaultの値、現在の値、type。
     // 💡 typeは USIプロトコルのsetoptionの時に指定できるオプションの型名。

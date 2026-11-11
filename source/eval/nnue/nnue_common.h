@@ -13,9 +13,6 @@
 
 #include "../../misc.h"  // Tools::Result
 
-#if defined(USE_WASM_SIMD)
-#include "./wasm_simd.h"
-#endif
 
 namespace YaneuraOu {
 
@@ -58,11 +55,7 @@ namespace Eval::NNUE {
 
   // Version of the evaluation file
   // 評価関数ファイルのバージョンを表す定数
-#if defined(ENABLE_SFNN_16BIT_WEIGHT)
-  constexpr std::uint32_t kVersion = 0x7AF32F17u;
-#else
   constexpr std::uint32_t kVersion = 0x7AF32F16u;
-#endif
 
   // LEB128圧縮データを識別するためのmagic string
   constexpr const char        Leb128MagicString[] = "COMPRESSED_LEB128";
@@ -84,12 +77,7 @@ namespace Eval::NNUE {
   constexpr std::size_t kSimdWidth = 32;
   #elif defined(USE_SSE2)
   constexpr std::size_t kSimdWidth = 16;
-  #elif defined(USE_MMX)
-  constexpr std::size_t kSimdWidth = 8;
-
   #elif defined(USE_NEON)
-  constexpr std::size_t kSimdWidth = 16;
-  #elif defined(USE_WASM_SIMD)
   constexpr std::size_t kSimdWidth = 16;
   #endif
   constexpr std::size_t kMaxSimdWidth = 32;

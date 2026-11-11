@@ -1,6 +1,5 @@
 ﻿#include "mate.h"
 
-#if defined(USE_MATE_1PLY) && !defined(LONG_EFFECT_LIBRARY)
 
 // clang-format off
 // 🌈 indentに特別な意味があるので、clang-formatはこのファイルでは無効化しておく。
@@ -2182,4 +2181,3 @@ namespace Mate {
 
 // clang-format on
 
-#endif // if defined(MATE_1PLY)...

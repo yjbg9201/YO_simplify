@@ -574,15 +574,6 @@ protected:
 	// 置換表
     TranspositionTable& tt;
 
-#if defined(EVAL_SFNN)
-	// TODO : あとで検討する
-
-	const LazyNumaReplicatedSystemWide<Eval::NNUE::Networks>& networks;
-
-    // Used by NNUE
-    Eval::NNUE::AccumulatorStack  accumulatorStack;
-    Eval::NNUE::AccumulatorCaches refreshTable;
-#endif
 
 	friend class YaneuraOu::ThreadPool;
 #if STOCKFISH

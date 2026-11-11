@@ -10,7 +10,6 @@
 #include "book/book.h"
 #include "movegen.h"
 
-#include "eval/evaluate_common.h"
 
 using namespace std;
 namespace YaneuraOu {
@@ -1828,10 +1827,6 @@ void Position::do_move_impl(Move m, StateInfo& newSt, bool givesCheck, const T* 
             //    ↑のあとに行う必要がある。
             put_hand_piece(Us, pr);
 
-#if defined(USE_SFNN)
-            dp.remove_pc = captured;
-            dp.remove_sq = capsq;
-#endif
 
 	        // Update board and piece lists
             // 捕獲される駒の除去

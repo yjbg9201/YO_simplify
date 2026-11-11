@@ -319,11 +319,6 @@ std::ostream& operator<<(std::ostream& os, const OptionsMap& om) {
 	// 前回のOptions["EvalDir"]
 	std::string last_eval_dir;
 
-#if defined(__EMSCRIPTEN__) && defined(EVAL_NNUE)
-	// WASM NNUE
-	// 前回のOptions["EvalFile"]
-	std::string last_eval_file;
-#endif
 
 	std::ostream& operator<<(std::ostream& os, const OptionsMap& om)
 	{

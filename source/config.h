@@ -376,14 +376,12 @@ constexpr int MAX_PLY_NUM = 246;
 
 		#define USE_DIFF_EVAL
 
-	#if defined(YANEURAOU_ENGINE_NNUE) && !defined(NNUE_EMBEDDING)
 		// 📝 Stockfishでは、NNUE_EMBEDDING_OFFを定義した時にのみ、
 		//    評価関数パラメーターをファイルから読みこむ機能が有効になる。
 		//    (定義しないとincbinを用いて埋め込まれているものを読み込む)
 		//     やねうら王もこれに倣ったので、埋め込まないならばNNUE_EMBEDDING_OFFを
 		//    定義する必要がある。
 		#define NNUE_EMBEDDING_OFF
-	#endif
 
 	// デバッグ絡み
 	//#define ASSERT_LV 3
@@ -621,16 +619,7 @@ constexpr bool pretty_jp = false;
 // ----------------------------
 
 // -- 評価関数の種類によりエンジン名に使用する文字列を変更する。
-#if   defined(EVAL_NNUE_KP256)
-	#define EVAL_TYPE_NAME "NNUE KP256"
-#elif defined(EVAL_NNUE_HALFKPE9)
-	#define EVAL_TYPE_NAME "NNUE halfKPE9"
-	// hafeKPE9には利きが必要
-	#define LONG_EFFECT_LIBRARY
-	#define USE_BOARD_EFFECT_PREV
-#else
 	#define EVAL_TYPE_NAME "NNUE"
-#endif
 
 
 // -- 評価関数の種類により、盤面の利きの更新ときの処理が異なる。(このタイミングで評価関数の差分計算をしたいので)

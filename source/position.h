@@ -77,14 +77,6 @@ struct StateInfo {
     int continuousCheck[COLOR_NB];
 #endif
 
-#if defined(SFNNwoPSQT) && defined(NNUE_SFNN_PROGRESS_BUCKETS) && NNUE_SFNN_PROGRESS_BUCKETS != 1
-	// NNUE progress bucket用の進行度計算キャッシュ。
-	Key nnue_progress_key;
-	int64_t nnue_progress_sum;
-	Square nnue_progress_sq_bk;
-	Square nnue_progress_sq_wk;
-	bool nnue_progress_valid;
-#endif
 
 
 	// 📌 ここまではdo_move()のなかでmemcpy()でコピーされる 📌

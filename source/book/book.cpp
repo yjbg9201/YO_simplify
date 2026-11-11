@@ -8,7 +8,6 @@
 #include <numeric>      // std::accumulate()
 
 #include "book.h"
-#include "apery_book.h"
 #include "../position.h"
 #include "../misc.h"
 #include "../search.h"
@@ -24,29 +23,6 @@ namespace Book
 		os << "move " << c.move << " , ponder " << c.ponder << " , value " << c.value << " , depth " << c.depth;
 		return os;
 	}
-
-	// Aperyの指し手の変換。
-	Move16 convert_move_from_apery(uint16_t apery_move) {
-		Move16 m;
-
-		const uint16_t to = apery_move & 0x7f;
-		const uint16_t from = (apery_move >> 7) & 0x7f;
-		const bool is_promotion = (apery_move & (1 << 14)) != 0;
-		if (is_promotion)
-			m =  make_move_promote16(static_cast<Square>(from), static_cast<Square>(to));
-		else
-		{
-			const bool is_drop = ((apery_move >> 7) & 0x7f) >= SQ_NB;
-			if (is_drop) {
-				const uint16_t piece = from - SQ_NB + 1;
-				m = make_move_drop16(static_cast<PieceType>(piece), static_cast<Square>(to));
-			}
-			else
-				m = make_move16(static_cast<Square>(from), static_cast<Square>(to));
-		}
-
-		return Move16(m);
-	};
 
 	// BookMoveを一つ追加する。
 	// 動作はinsert()とほぼ同じだが、この局面に同じ指し手は存在しないことがわかっている時に用いる。
@@ -199,8 +175,6 @@ namespace Book
 	//			MemoryBook
 	// ----------------------------------
 
-	static std::unique_ptr<AperyBook> apery_book;
-	static const constexpr char* kAperyBookName = "book.bin";
 	static constexpr std::array<char, 16> YbbMagic = {
 		'Y', 'A', 'N', 'E', '-', 'B', 'I', 'N',
 		'B', 'O', 'O', 'K', '-', 'V', '1', '\0',
@@ -552,7 +526,7 @@ namespace Book
 			ybb_moves_fs.close();
 		this->ignoreBookPly = ignore_book_ply_;
 
-		// フォルダ名を取り去ったものが"no_book"(定跡なし)もしくは"book.bin"(Aperyの定跡ファイル)であるかを判定する。
+		// フォルダ名を取り去ったものが"no_book"(定跡なし)であるかを判定する。
 		auto pure_filename = Path::GetFileName(filename);
 		auto actual_filename = filename;
 		auto actual_pure_filename = pure_filename;
@@ -565,13 +539,7 @@ namespace Book
 			return Tools::Result::Ok();
 		}
 
-		if (pure_filename == kAperyBookName) {
-			// Apery定跡データベースを読み込む
-			//	apery_book = std::make_unique<AperyBook>(kAperyBookName);
-			// これ、C++14の機能。C++11用に以下のように書き直す。
-			apery_book = std::unique_ptr<AperyBook>(new AperyBook(filename));
-		}
-		else {
+		{
 			actual_filename = resolve_book_filename_with_ybb_fallback(filename);
 			actual_pure_filename = Path::GetFileName(actual_filename);
 			if (actual_filename != filename)
@@ -1154,48 +1122,7 @@ namespace Book
 		if (pure_book_name == "no_book")
 			return BookMovesPtr();
 
-		if (pure_book_name == kAperyBookName) {
-
-			BookMovesPtr pml_entry(new BookMoves());
-
-			// Apery定跡データベースを用いて指し手を選択する
-			const auto& entries = apery_book->get_entries(pos);
-			int64_t sum_count = 0;
-			for (const auto& entry : entries) {
-				sum_count += entry.count;
-			}
-
-			// 定跡ファイルによっては、採用率がすべて0ということがありうる。
-			// cf. https://github.com/yaneurao/YaneuraOu/issues/65
-			// この場合、sum_count == 0になるので、採用率を当確率だとみなして、1.0 / entries.size() にしておく。
-
-			for (const auto& entry : entries) {
-
-				Move16 theMove16 = convert_move_from_apery(entry.fromToPro);
-				Move16 thePonder = Move16::none();
-#if 0
-				// Aperyの定跡、ponderの指し手が書かれていない。合法手であるなら、1手進めて、その局面の定跡をprobe()して取得する。
-				// →　呼び出し元で定跡PVの構築のためにこれに該当する処理は行われるから、ここでやらなくてよさそう。
-				Move   theMove   = pos.to_move(theMove16);
-				if (pos.pseudo_legal_s<true>(theMove) && pos.legal(theMove))
-				{
-					StateInfo si;
-					Position* thePos = const_cast<Position*>(&pos);
-					thePos->do_move(theMove,si);
-					const auto& entries2 = apery_book->get_entries(pos);
-					if (entries2.size())
-						thePonder = convert_move_from_apery(entries2[0].fromToPro); // 1つ目の指し手にしておく。
-					thePos->undo_move(theMove);
-				}
-#endif
-				BookMove book_pos(theMove16 , thePonder , entry.score, 256, entry.count);
-				pml_entry->insert(book_pos,true);
-			}
-			pml_entry->sort_moves();
-
-			return 	pml_entry;
-		}
-		else {
+		{
 			// やねうら王定跡データベースを用いて指し手を選択する
 
 			// 定跡がないならこのまま返る。(sfen()を呼び出すコストの節約)
@@ -1327,25 +1254,14 @@ namespace Book
 		//  user_book1.db    ユーザー定跡1
 		//  user_book2.db    ユーザー定跡2
 		//  user_book3.db    ユーザー定跡3
-		//  book.bin         Apery型の定跡DB
 
 		std::vector<std::string> book_list = { "no_book" , "standard_book.db"
 			, "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db", "yaneura_book4.db"
-			, "user_book1.db", "user_book2.db", "user_book3.db", "book.bin" };
+			, "user_book1.db", "user_book2.db", "user_book3.db" };
 
-#if !defined(__EMSCRIPTEN__)
 		options.add("BookFile", Option(book_list, book_options_v2 ? "user_book1.db" : book_list[1]));
-#else
-		// WASM では no_book をデフォルトにする
-        options.add("BookFile", Option(book_list, book_list[0]));
-#endif
 
-#if !defined(__EMSCRIPTEN__)
         options.add("BookDir", Option("book"));
-#else
-		// WASM
-        options.add("BookDir", Option("."));
-#endif
 
 		//  BookEvalDiff: 定跡の指し手で1番目の候補の指し手と、2番目以降の候補の指し手との評価値の差が、
 		//    この範囲内であれば採用する。(1番目の候補の指し手しか選ばれて欲しくないときは0を指定する)

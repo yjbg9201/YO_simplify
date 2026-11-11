@@ -28,7 +28,6 @@
 #include "../../movepick.h"
 #include "../../usi.h"
 #include "../../mate/mate.h"
-#include "../../tune.h"
 
 namespace YaneuraOu {
 
@@ -39,10 +38,6 @@ using namespace Eval;  // Eval::PieceValue
 // 🌈 やねうら王独自追加
 // -------------------
 
-// 🌈 tune.pyによって自動的にTUNEする変数宣言がここ以下に追加される。
-// 📝 tune.pyとは、パラメーター自動調整フレームワークのスクリプトである。
-//     https://github.com/yaneurao/YaneuraOu-ScriptCollection/tree/main/SPSA
-//                            %%TUNE_DECLARATION%%
 
 
 // この構造体メンバーに対応するエンジンオプションを生やす
@@ -221,12 +216,8 @@ void YaneuraOuEngine::add_options() {
 
 #endif
 
-	// 🌈 tune.pyによってここ以下に自動的にエンジンオプションが追加される。
-	//                      %%TUNE_OPTIONS%%
 
 
-	// もしTUNE()マクロで新たにパラメーターを追加したなら、それを反映させる。
-	Tune::init(options);
 }
 
 // "isready"のタイミングでの初期化処理。
@@ -261,8 +252,6 @@ void YaneuraOuEngine::isready() {
 	// 定跡の読み込み
     book.read_book();
 
-	// 🌈 tune.pyによってここ以下に自動的にエンジンオプションが追加される。
-    //                      %%TUNE_ISREADY%%
 
 
     sync_cout << "readyok" << sync_endl;
@@ -713,11 +702,6 @@ void Search::YaneuraOuWorker::pre_start_searching() {
 
 void Search::YaneuraOuWorker::start_searching() {
 
-#if defined(USE_SFNN)
-    // 探索の初回evaluate()では局面の差分更新ができないので
-    // accumulatorの初回フラグをセットする。
-    accumulatorStack.reset();
-#endif
 
     // 前回のgoで得たPVは今回の探索では使えないので、各Workerの探索開始時に破棄する。
     lastIterationPV.clear();
@@ -1827,18 +1811,9 @@ void YaneuraOuWorker::do_move(
 
 	nodes.store(nodes.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
 
-#if defined(EVAL_SFNN)
-
-    // accumulatorStackを用いる実装。
-
-    DirtyBoardData dirtyBoardData = pos.do_move(move, st, givesCheck, &tt);
-    accumulatorStack.push(dirtyBoardData);
-
-#else
 
     pos.do_move(move, st, givesCheck, &tt);
 
-#endif
 
     if (ss != nullptr)
     {
@@ -1867,9 +1842,6 @@ void YaneuraOuWorker::undo_move(Position& pos, const Move move) {
 
 	pos.undo_move(move);
 
-#if defined(EVAL_SFNN)
-    //accumulatorStack.pop();
-#endif
 }
 
 void YaneuraOuWorker::undo_null_move(Position& pos) { pos.undo_null_move(); }
@@ -1911,9 +1883,6 @@ void YaneuraOuWorker::clear() {
 
 	// 📝 lowPlyHistoryの初期化は、対局ごとではなく、局面ごと("go"のごと)に変更された。
 
-#if defined(EVAL_SFNN)
-    refreshTable.clear(networks[numaAccessToken]);
-#endif
 }
 
 // qsearch<PV>()をTT hitなし扱いで単独呼び出しするためのヘルパー。
@@ -1921,10 +1890,6 @@ void YaneuraOuWorker::clear() {
 // qsearchのleaf node局面を得られる。通常探索のinfo pv表示のようにTTを辿ってPVを延長しない。
 Value YaneuraOuWorker::qsearch_pv(Position& pos, PVMoves& pv) {
 
-#if defined(USE_SFNN)
-    // 探索開始時と同様、初回evaluate()で差分更新を使わない状態に戻す。
-    accumulatorStack.reset();
-#endif
 
     nodes.store(0, std::memory_order_relaxed);
     selDepth = 0;
@@ -2112,44 +2077,7 @@ Value YaneuraOuWorker::search(Position& pos, Stack* ss, Value alpha, Value beta,
                 || ((ss - 1)->followPV && static_cast<size_t>(ss->ply - 1) < lastIterationPV.size()
                     && (ss - 1)->currentMove == lastIterationPV[ss->ply - 1]);
 
-#if defined(USE_CLASSIC_EVAL) && defined(USE_LAZY_EVALUATE)
-	// 📝 次のnodeに行くまでにevaluate()かevaluate_with_no_return()を呼び出すことを保証して
-	//     evaluate内の差分計算を促さなければならない。
-    bool evaluated = false;
-    auto evaluate  = [&](Position& pos) {
-        evaluated = true;
-        return this->evaluate(pos);
-    };
-    auto do_move = [&](Position & pos, Move move, StateInfo& st, bool givesCheck, Stack* ss) {
-        if (!evaluated)
-        {
-            evaluated = true;
-            Eval::evaluate_with_no_return(pos);
-        }
-        this->do_move(pos, move, st, givesCheck, ss);
-    };
-
-	// 🤔 同じ名前で呼び分けできないので、
-	//     こちらを名前を do_move_ にする。
-    auto do_move_ = [&](Position & pos, Move move, StateInfo& st, Stack* ss) {
-        if (!evaluated)
-        {
-            evaluated = true;
-            Eval::evaluate_with_no_return(pos);
-        }
-        this->do_move(pos, move, st, ss);
-    };
-    auto do_null_move = [&](Position& pos, StateInfo& st) {
-        if (!evaluated)
-        {
-            evaluated = true;
-            Eval::evaluate_with_no_return(pos);
-        }
-        this->do_null_move(pos, st);
-    };
-#else
     auto do_move_ = [&](Position& pos, Move move, StateInfo& st, Stack* ss) { this->do_move(pos, move, st, ss); };
-#endif
 
 	// 📌 Timerの監視
 
@@ -2782,27 +2710,9 @@ Value YaneuraOuWorker::search(Position& pos, Stack* ss, Value alpha, Value beta,
             unadjustedStaticEval = evaluate(pos);
 
 #if !STOCKFISH
-#if defined(USE_LAZY_EVALUATE)
-        // 🌈 これ書かないとR70ぐらい弱くなる。
-        else if (PvNode)
-        {
-			unadjustedStaticEval = evaluate(pos);
-
-			/*
-				 🤔 : ここでevaluate() が必須な理由がよくわからない。
-				       Stockfishには無いのに…。なぜなのか…。
-
-				lazy_evaluate()に変える                        ⇨ 弱い(V8.38dev-n7)
-				unadjustedStaticEvalに代入せずに単にevaluate() ⇨ 特に弱くはなさそう(V838dev_n8)
-				結論的には、NNUEのevaluate_with_no_return()とevaluate()の挙動が違うのが原因っぽい。
-				これはあきませんわ…。
-			*/
-        }
-#else
         // lazy evalを使わないなら、この時点でどうにかしておく。
         else
 			unadjustedStaticEval = evaluate(pos);
-#endif
 #endif
 
         ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
@@ -4253,21 +4163,6 @@ Value Search::YaneuraOuWorker::qsearch(Position& pos, Stack* ss, Value alpha, Va
     ss->inCheck                 = pos.checkers();
     moveCount                   = 0;
 
-#if defined(USE_CLASSIC_EVAL) && defined(USE_LAZY_EVALUATE)
-    bool evaluated = false;
-    auto evaluate  = [&](Position& pos) {
-        evaluated = true;
-        return this->evaluate(pos);
-    };
-    auto do_move = [&](Position& pos, Move move, StateInfo& st, bool givesCheck, Stack* ss) {
-        if (!evaluated)
-        {
-            evaluated = true;
-            Eval::evaluate_with_no_return(pos);
-        }
-        this->do_move(pos, move, st, givesCheck, ss);
-    };
-#endif
 
 #if STOCKFISH
 #else
@@ -4893,15 +4788,7 @@ TimePoint Search::Worker::elapsed_time() const { return main_manager()->tm.elaps
 
 Value Search::YaneuraOuWorker::evaluate(const Position& pos) {
 
-#if defined(EVAL_SFNN)
-	// 最新のStockfishのコード
-
-    return Eval::evaluate(networks[numaAccessToken], pos, accumulatorStack, refreshTable,
-                          optimism[pos.side_to_move()]);
-
-#else
 	return Eval::evaluate(pos);
-#endif
 }
 
 namespace {
@@ -5644,14 +5531,8 @@ void engine_main() {
     usi->set_engine(*engine);  // エンジン実装を差し替える。
     usi->enqueue_startup_commands(CommandLine::g);
 
-#if defined(__EMSCRIPTEN__)
-    // 🌈 wasmではloop()が即座にreturnするので、インスタンスを保持したうえでJS側に制御を返す。
-    //     以後のコマンドはusi_command()経由で実行される。
-    wasm_keep_alive(std::move(engine), std::move(usi));
-#else
     // USIコマンドの応答のためのループ
     usi->loop();
-#endif
 }
 
 // このentry pointを登録しておく。
